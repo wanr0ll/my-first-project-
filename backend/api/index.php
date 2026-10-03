@@ -125,7 +125,7 @@ try {
             break;
 
         case '':
-            Response::success(['status' => 'ok'], 'Railway root health check passed');
+            Response::success(['status' => 'ok'], 'Render API root health check passed (Connected to Supabase)');
             break;
 
 
