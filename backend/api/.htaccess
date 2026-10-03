@@ -1,0 +1,17 @@
+# Ensure this directory is served by index.php when no file is specified
+DirectoryIndex index.php
+
+RewriteEngine On
+# RewriteBase /gha-asset-manager/backend/api/  # For XAMPP local
+# RewriteBase /api/                            # For Railway
+# Leaving RewriteBase empty/commented out often works for both by using relative paths.
+
+# Allow requests to actual files and folders
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Rewrite all requests to index.php
+RewriteRule ^(.*)$ index.php?request=$1 [QSA,L]
+
+# Prevent directory listing
+Options -Indexes

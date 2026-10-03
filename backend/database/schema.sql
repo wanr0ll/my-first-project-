@@ -1,0 +1,273 @@
+-- GHA Asset Manager Database Schema
+-- Create database if not exists
+CREATE DATABASE IF NOT EXISTS gha_asset_manager;
+USE gha_asset_manager;
+
+-- Users Table
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    role ENUM('Super Admin', 'Administrator', 'CEO', 'Chief Executive', 'Director', 'Worker', 'Maintenance') NOT NULL,
+    position VARCHAR(100) DEFAULT NULL,
+    division VARCHAR(100),
+    status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
+    email_verified BOOLEAN DEFAULT FALSE,
+    profile_image VARCHAR(255),
+    permissions JSON DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    last_active DATETIME NULL DEFAULT NULL,
+    reset_token VARCHAR(255) NULL,
+    reset_token_expiry DATETIME NULL,
+    INDEX idx_email (email),
+    INDEX idx_role (role),
+    INDEX idx_division (division)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Vehicles Table
+CREATE TABLE IF NOT EXISTS vehicles (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    plate_number VARCHAR(50) UNIQUE NOT NULL,
+    status ENUM('Active', 'Inactive', 'Maintenance', 'Disposed') DEFAULT 'Active',
+    division VARCHAR(100),
+    chassis_number VARCHAR(100),
+    engine_number VARCHAR(100),
+    purchase_date DATE,
+    purchase_cost DECIMAL(12, 2),
+    last_service_date DATE,
+    last_inspection_date DATE,
+    approval_status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    INDEX idx_status (status),
+    INDEX idx_division (division),
+    INDEX idx_plate (plate_number),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Furniture Table
+CREATE TABLE IF NOT EXISTS furniture (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(100),
+    division VARCHAR(100),
+    quantity INT DEFAULT 1,
+    asset_condition ENUM('Good', 'Fair', 'Poor') DEFAULT 'Good',
+    status ENUM('Good', 'Fair', 'Poor', 'Disposed') DEFAULT 'Good',
+    location VARCHAR(255),
+    purchase_date DATE,
+    purchase_cost DECIMAL(12, 2),
+    approval_status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    INDEX idx_status (status),
+    INDEX idx_division (division),
+    INDEX idx_asset_condition (asset_condition),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Electronics Table
+CREATE TABLE IF NOT EXISTS electronics (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(100),
+    serial_number VARCHAR(100) UNIQUE,
+    assigned_to VARCHAR(50),
+    status ENUM('Active', 'Inactive', 'Maintenance', 'Disposed') DEFAULT 'Active',
+    division VARCHAR(100),
+    purchase_date DATE,
+    purchase_cost DECIMAL(12, 2),
+    warranty_expiry DATE,
+    approval_status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    INDEX idx_status (status),
+    INDEX idx_serial (serial_number),
+    INDEX idx_assigned_to (assigned_to),
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (assigned_to) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Indoor Devices Table
+CREATE TABLE IF NOT EXISTS indoor_devices (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(100),
+    location VARCHAR(255),
+    status ENUM('Active', 'Inactive', 'Maintenance', 'Disposed') DEFAULT 'Active',
+    division VARCHAR(100),
+    purchase_date DATE,
+    purchase_cost DECIMAL(12, 2),
+    last_service_date DATE,
+    approval_status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    INDEX idx_status (status),
+    INDEX idx_location (location),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Unified Assets Table
+CREATE TABLE IF NOT EXISTS assets (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    major_category ENUM('Fixed Asset', 'Non Fixed Asset') NOT NULL,
+    asset_type ENUM('Moveable', 'Non Moveable', 'Other') DEFAULT 'Other',
+    category VARCHAR(255) NOT NULL,
+    sub_type VARCHAR(255),
+    status VARCHAR(100) DEFAULT 'Active',
+    division VARCHAR(100),
+    owner_division VARCHAR(100),
+    custodian_name VARCHAR(255),
+    custodian_id VARCHAR(50),
+    location VARCHAR(255),
+    purchase_date DATE,
+    purchase_cost DECIMAL(12, 2),
+    useful_life INT DEFAULT 5,
+    residual_value DECIMAL(12, 2) DEFAULT 0,
+    last_service_date DATE,
+    last_inspection_date DATE,
+    approval_status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    notes TEXT,
+    image TEXT,
+    serial_number VARCHAR(100),
+    plate_number VARCHAR(50),
+    chassis_number VARCHAR(100),
+    engine_number VARCHAR(100),
+    sizes VARCHAR(255),
+    color VARCHAR(100),
+    room_number VARCHAR(50),
+    desk_number VARCHAR(50),
+    room_name VARCHAR(100),
+    staff_assigned_to VARCHAR(255),
+    staff_id VARCHAR(50),
+    type VARCHAR(100),
+    custodian_address VARCHAR(255),
+    custodian_mobile VARCHAR(50),
+    brand_name VARCHAR(100),
+    model VARCHAR(100),
+    asset_tag VARCHAR(100),
+    has_asset_tag ENUM('Yes','No') DEFAULT 'No',
+    memory_size VARCHAR(50),
+    processor VARCHAR(100),
+    generation VARCHAR(50),
+    storage_size VARCHAR(100),
+    route_name VARCHAR(100),
+    quantity INT,
+    capacity VARCHAR(100),
+    expiry_date DATE,
+    warranty_expiry DATE,
+    receipt_url TEXT,
+    chair_material VARCHAR(100),
+    workstation_material VARCHAR(100),
+    partition_material VARCHAR(100),
+    battery_type VARCHAR(100),
+    runtime VARCHAR(100),
+    number_of_floors VARCHAR(50),
+    number_of_seats VARCHAR(50),
+    bank_name VARCHAR(100),
+    account_number VARCHAR(100),
+    account_type VARCHAR(50),
+    branch VARCHAR(100),
+    currency VARCHAR(20),
+    balance_amount DECIMAL(15,2),
+    year_of_manufacture YEAR,
+    fuel_type VARCHAR(50),
+    transmission VARCHAR(50),
+    engine_size VARCHAR(20),
+    mileage VARCHAR(100),
+    ip_address VARCHAR(50),
+    port_count VARCHAR(50),
+    printer_type VARCHAR(100),
+    scanner_type VARCHAR(100),
+    license_type VARCHAR(100),
+    software_version VARCHAR(50),
+    license_key VARCHAR(255),
+    vendor VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    INDEX idx_major (major_category),
+    INDEX idx_type (asset_type),
+    INDEX idx_category (category),
+    INDEX idx_status (status),
+    INDEX idx_division (division),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Maintenance Tasks Table
+CREATE TABLE IF NOT EXISTS maintenance_tasks (
+    id VARCHAR(50) PRIMARY KEY,
+    asset_id VARCHAR(50) NOT NULL,
+    asset_type VARCHAR(100) NOT NULL,
+    description TEXT,
+    task_type VARCHAR(100),
+    priority ENUM('Low', 'Medium', 'High', 'Critical') DEFAULT 'Medium',
+    status ENUM('Scheduled', 'In Progress', 'Completed', 'Overdue', 'Cancelled') DEFAULT 'Scheduled',
+    assigned_to VARCHAR(50),
+    scheduled_date DATE NOT NULL,
+    completed_date DATE,
+    estimated_cost DECIMAL(12, 2),
+    actual_cost DECIMAL(12, 2),
+    parts_maintained TEXT,
+    receipt_url TEXT DEFAULT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(50),
+    INDEX idx_status (status),
+    INDEX idx_asset_id (asset_id),
+    INDEX idx_assigned_to (assigned_to),
+    INDEX idx_priority (priority),
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (assigned_to) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Asset History Table (for audit trail)
+CREATE TABLE IF NOT EXISTS asset_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    asset_id VARCHAR(50) NOT NULL,
+    asset_type VARCHAR(100),
+    action VARCHAR(100),
+    description TEXT,
+    old_values JSON,
+    new_values JSON,
+    performed_by VARCHAR(50),
+    performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_asset_id (asset_id),
+    INDEX idx_performed_by (performed_by),
+    FOREIGN KEY (performed_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    title VARCHAR(255),
+    message TEXT,
+    type ENUM('info', 'warning', 'error', 'success') DEFAULT 'info',
+    related_asset_id VARCHAR(50),
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_is_read (is_read),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Insert default admin and superadmin users (password: GHA@Superadmin2026 - hashed)
+INSERT INTO users (id, name, email, password, role, position, status, email_verified) VALUES
+('USR_SUPER', 'Super Administrator', 'superadmin@gha.gov.gh', '$2y$10$21N28teuBW6CB97hv33Vp.94kghtCl/0E7v2jwEOcrzp2Fb5CxNI.', 'Super Admin', 'Super Administrator', 'active', TRUE),
+('USR001', 'Admin User', 'admin@gha.gov.gh', '$2y$10$21N28teuBW6CB97hv33Vp.94kghtCl/0E7v2jwEOcrzp2Fb5CxNI.', 'Super Admin', 'Administrator', 'active', TRUE);

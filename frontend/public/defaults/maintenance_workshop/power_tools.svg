@@ -1,0 +1,32 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#14532d"/>
+      <stop offset="100%" style="stop-color:#1a2e1f"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <!-- Cordless Drill body -->
+  <rect x="150" y="150" width="130" height="80" rx="12" fill="#374151"/>
+  <rect x="155" y="155" width="60" height="40" rx="8" fill="#4b5563"/>
+  <!-- Drill chuck -->
+  <rect x="280" y="178" width="50" height="24" rx="6" fill="#6b7280"/>
+  <rect x="325" y="183" width="28" height="14" rx="4" fill="#9ca3af"/>
+  <!-- Drill handle -->
+  <rect x="185" y="225" width="50" height="80" rx="10" fill="#374151"/>
+  <!-- Battery pack -->
+  <rect x="175" y="295" width="70" height="28" rx="8" fill="#16a34a"/>
+  <!-- Trigger -->
+  <rect x="200" y="220" width="20" height="16" rx="4" fill="#22c55e"/>
+  <!-- Angle grinder -->
+  <rect x="360" y="160" width="110" height="55" rx="10" fill="#1d4ed8" transform="rotate(-10 415 187)"/>
+  <circle cx="395" cy="265" r="38" fill="none" stroke="#3b82f6" stroke-width="14"/>
+  <circle cx="395" cy="265" r="18" fill="#60a5fa"/>
+  <rect x="410" y="185" width="22" height="75" rx="6" fill="#2563eb" transform="rotate(-10 421 222)"/>
+  <!-- Sparks -->
+  <line x1="360" y1="295" x2="340" y2="315" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+  <line x1="370" y1="300" x2="355" y2="325" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+  <line x1="378" y1="298" x2="368" y2="320" stroke="#f97316" stroke-width="2" stroke-linecap="round"/>
+  <!-- Label -->
+  <text x="50%" y="375" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="bold" fill="#f1f5f9" text-anchor="middle">Power Tools</text>
+</svg>

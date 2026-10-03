@@ -1,0 +1,27 @@
+<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <!-- Hammer -->
+  <rect x="150" y="220" width="130" height="22" rx="8" fill="#92400e" transform="rotate(-40 215 231)"/>
+  <rect x="185" y="145" width="70" height="45" rx="8" fill="#78716c"/>
+  <rect x="195" y="140" width="50" height="20" rx="5" fill="#a8a29e"/>
+  <!-- Screwdriver -->
+  <rect x="310" y="130" width="16" height="150" rx="6" fill="#f59e0b" transform="rotate(15 318 205)"/>
+  <rect x="305" y="125" width="26" height="35" rx="5" fill="#d97706" transform="rotate(15 318 142)"/>
+  <rect x="314" y="270" width="8" height="25" rx="2" fill="#64748b" transform="rotate(15 318 282)"/>
+  <!-- Wrench -->
+  <rect x="380" y="160" width="18" height="130" rx="7" fill="#64748b" transform="rotate(20 389 225)"/>
+  <circle cx="400" cy="172" r="22" fill="none" stroke="#94a3b8" stroke-width="12"/>
+  <circle cx="374" cy="278" r="16" fill="none" stroke="#94a3b8" stroke-width="10"/>
+  <!-- Pliers -->
+  <rect x="200" y="280" width="14" height="90" rx="5" fill="#475569" transform="rotate(-15 207 325)"/>
+  <rect x="220" y="280" width="14" height="90" rx="5" fill="#475569" transform="rotate(15 227 325)"/>
+  <ellipse cx="215" cy="285" rx="22" ry="14" fill="#64748b"/>
+  <!-- Label -->
+  <text x="50%" y="375" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="bold" fill="#f1f5f9" text-anchor="middle">Hand Tools</text>
+</svg>
