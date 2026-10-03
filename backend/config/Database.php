@@ -35,7 +35,9 @@ class Database
             $this->host    = $parsed['host'] ?? 'localhost';
             $this->user    = $parsed['user'] ?? '';
             $this->pass    = urldecode($parsed['pass'] ?? '');
-            $this->db_name = ltrim($parsed['path'] ?? '', '/');
+            $rawPath = explode('?', ltrim($parsed['path'] ?? '', '/'))[0];
+            $cleanDbName = trim($rawPath, " \t\n\r\0\x0B_");
+            $this->db_name = !empty($cleanDbName) ? $cleanDbName : 'postgres';
             $this->port    = (int)($parsed['port'] ?? ($this->driver === 'pgsql' ? 5432 : 3306));
             return;
         }
