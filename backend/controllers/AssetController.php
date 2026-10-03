@@ -79,7 +79,8 @@ class AssetController
         }
 
         // Add creator info
-        $data['createdBy'] = $user['name'] ?? $user['email'] ?? 'System';
+        $data['createdBy'] = $user['id'];
+        $creatorName = $user['name'] ?? $user['email'] ?? 'System';
 
         // Force new manual assets to require approval
         $data['approvalStatus'] = 'Pending';
@@ -95,14 +96,14 @@ class AssetController
                 $result['id'],
                 $data['asset_type'] ?? 'Asset',
                 'Asset Registered',
-                "New asset '{$data['name']}' was registered by {$data['createdBy']}",
+                "New asset '{$data['name']}' was registered by {$creatorName}",
                 $user['id']
             );
         }
         if ($this->notificationModel) {
             $this->notificationModel->notifyAdmins(
                 'New Asset Registered',
-                "Asset '{$data['name']}' was added to the system by {$data['createdBy']}.",
+                "Asset '{$data['name']}' was added to the system by {$creatorName}.",
                 'success',
                 $result['id']
             );
