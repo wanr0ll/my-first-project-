@@ -1,5 +1,36 @@
 <?php
 
+// Serve uploaded static files (profile pictures, assets, attachments) directly
+$requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+if (preg_match('#/uploads/(.+)#i', $requestUri, $matches)) {
+    $filename = $matches[1];
+    $filePath = __DIR__ . '/../uploads/' . $filename;
+    if (file_exists($filePath) && !is_dir($filePath)) {
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $mimeTypes = [
+            'png'  => 'image/png',
+            'jpg'  => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'gif'  => 'image/gif',
+            'svg'  => 'image/svg+xml',
+            'webp' => 'image/webp',
+            'pdf'  => 'application/pdf'
+        ];
+        $mime = $mimeTypes[$ext] ?? 'application/octet-stream';
+        
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . filesize($filePath));
+        header('Access-Control-Allow-Origin: *');
+        header('Cache-Control: public, max-age=86400');
+        readfile($filePath);
+        exit;
+    }
+}
+
 /**
  * API Router - Main entry point for all API requests
  */
