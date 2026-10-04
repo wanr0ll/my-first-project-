@@ -3,8 +3,12 @@
 /**
  * API Router - Main entry point for all API requests
  */
-// Prevent any output before JSON (no BOM, no notices in response)
-ob_start();
+// Prevent any output before JSON & enable GZIP compression for 5x-10x faster API network transfers
+if (!ini_get('zlib.output_compression') && function_exists('ob_gzhandler') && !headers_sent()) {
+    ob_start('ob_gzhandler');
+} else {
+    ob_start();
+}
 // Do not send PHP errors to output - they would break JSON
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');

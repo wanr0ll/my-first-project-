@@ -22,9 +22,11 @@ export const AssetProvider = ({ children }) => {
         }
     }, []);
 
-    const loadAssets = async () => {
+    const loadAssets = async (options = {}) => {
         try {
-            setLoading(true);
+            if (!options.silent && assets.length === 0) {
+                setLoading(true);
+            }
             const response = await API.getAssets('all', 1, 1000);
             const augmentedAssets = (response.data || []).map(asset => ({
                 ...asset,
@@ -34,7 +36,7 @@ export const AssetProvider = ({ children }) => {
         } catch (error) {
             console.error('Failed to load assets:', error);
             const token = localStorage.getItem('auth_token');
-            if (token) {
+            if (token && assets.length === 0) {
                 addToast('Failed to load assets', 'error');
             }
         } finally {

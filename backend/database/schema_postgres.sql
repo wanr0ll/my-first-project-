@@ -250,6 +250,9 @@ CREATE INDEX IF NOT EXISTS idx_assets_type ON assets(asset_type);
 CREATE INDEX IF NOT EXISTS idx_assets_category ON assets(category);
 CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
 CREATE INDEX IF NOT EXISTS idx_assets_division ON assets(division);
+CREATE INDEX IF NOT EXISTS idx_assets_approval ON assets(approval_status);
+CREATE INDEX IF NOT EXISTS idx_assets_created ON assets(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_assets_status_approval ON assets(status, approval_status);
 
 DROP TRIGGER IF EXISTS trg_assets_updated_at ON assets;
 CREATE TRIGGER trg_assets_updated_at BEFORE UPDATE ON assets FOR EACH ROW EXECUTE FUNCTION update_timestamp_column();
