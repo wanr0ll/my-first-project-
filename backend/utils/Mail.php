@@ -46,7 +46,8 @@ class Mail
                 'api-key: ' . $apiKey,
                 'content-type: application/json',
             ],
-            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_TIMEOUT        => 5,
+            CURLOPT_CONNECTTIMEOUT => 3,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
 

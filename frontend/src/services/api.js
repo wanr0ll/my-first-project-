@@ -59,9 +59,18 @@ export function getFullImageUrl(path) {
 export async function resolveBaseUrl() {
     if (resolvedBaseUrl) return resolvedBaseUrl;
 
+    try {
+        const cached = sessionStorage.getItem('gha_resolved_api_url');
+        if (cached) {
+            resolvedBaseUrl = cached;
+            return resolvedBaseUrl;
+        }
+    } catch { /* sessionStorage fallback */ }
+
     // In production with a configured URL, skip probing and use it directly
     if (!import.meta.env.DEV && CONFIGURED_BASE) {
         resolvedBaseUrl = CONFIGURED_BASE.replace(/\/$/, '');
+        try { sessionStorage.setItem('gha_resolved_api_url', resolvedBaseUrl); } catch {}
         return resolvedBaseUrl;
     }
 
@@ -80,12 +89,14 @@ export async function resolveBaseUrl() {
                 const data = await r.json();
                 if (data && data.success) {
                     resolvedBaseUrl = base.replace(/\/$/, '');
+                    try { sessionStorage.setItem('gha_resolved_api_url', resolvedBaseUrl); } catch {}
                     return resolvedBaseUrl;
                 }
             }
         } catch { /* health check failed, try next */ }
     }
     resolvedBaseUrl = CONFIGURED_BASE.replace(/\/$/, '');
+    try { sessionStorage.setItem('gha_resolved_api_url', resolvedBaseUrl); } catch {}
     return resolvedBaseUrl;
 }
 
