@@ -2,9 +2,11 @@
  * API Service - Handles all API calls to the PHP backend
  */
 
-// In production, use VITE_API_URL (Railway). In dev, use Vite proxy.
+const PROD_BACKEND_FALLBACK = 'https://my-first-project-production-e47d.up.railway.app/api/index.php';
+
+// In production, use VITE_API_URL (Railway/Render). In dev, use Vite proxy.
 const CONFIGURED_BASE = import.meta.env.VITE_API_URL
-    || (import.meta.env.DEV ? '/api/index.php' : null);
+    || (import.meta.env.DEV ? '/api/index.php' : PROD_BACKEND_FALLBACK);
 
 // Only try localhost fallbacks in development (avoids mixed-content errors on mobile in prod)
 const BASE_URL_CANDIDATES = import.meta.env.DEV
@@ -16,17 +18,17 @@ const BASE_URL_CANDIDATES = import.meta.env.DEV
         'http://127.0.0.1/gha-asset-manager/backend/api/index.php',
         'http://127.0.0.1/backend/api/index.php',
     ].filter(Boolean)
-    : [CONFIGURED_BASE].filter(Boolean);
+    : [CONFIGURED_BASE, PROD_BACKEND_FALLBACK].filter(Boolean);
 
 let resolvedBaseUrl = null;
 
 export function getBaseUrlSync() {
-    let base = import.meta.env.VITE_API_URL;
-    if (!base) {
+    let base = resolvedBaseUrl || import.meta.env.VITE_API_URL || CONFIGURED_BASE;
+    if (!base || base.startsWith('/api')) {
         if (import.meta.env.DEV) {
             base = 'http://localhost/gha-asset-manager/backend';
         } else {
-            base = '';
+            base = PROD_BACKEND_FALLBACK;
         }
     }
     // Remove /api/index.php or /api if it's there to get the root directory for uploads

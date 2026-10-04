@@ -129,7 +129,7 @@ const UserProfileMenu = () => {
                                         <LogOut size={16} className="text-text-muted group-hover:text-danger transition-colors" />
                                     </div>
                                     <span className="text-sm font-bold text-text-secondary group-hover:text-danger transition-colors">
-                                        Logout System
+                                        Logout
                                     </span>
                                 </button>
                             </div>
