@@ -110,10 +110,18 @@ class AuthController
         $subject = "Verify Your Account - Ghana Highway Authority";
         $emailMessage = "
             <div style='font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
-                <div style='background-color: #1e293b; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 26px 12px; text-align: center; border-bottom: 4px solid #f59e0b;'>
-                    <h1 style='color: #ffffff !important; color: #ffffff; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; white-space: nowrap;'><span style='color: #ffffff !important; color: #ffffff;'>Ghana Highway Authority</span></h1>
-                    <p style='color: #94a3b8 !important; color: #94a3b8; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap;'><span style='color: #94a3b8 !important; color: #94a3b8;'>Asset Management System</span></p>
-                </div>
+                <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: #1e293b !important; background: #1e293b !important;'>
+                    <tr>
+                        <td bgcolor='#1e293b' align='center' style='background-color: #1e293b !important; padding: 26px 12px; border-bottom: 4px solid #f59e0b; text-align: center;'>
+                            <h1 style='color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; white-space: nowrap; font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;'>
+                                <font color='#ffffff'><span style='color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;'>Ghana Highway Authority</span></font>
+                            </h1>
+                            <p style='color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap; font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;'>
+                                <font color='#94a3b8'><span style='color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important;'>Asset Management System</span></font>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
                 <div style='padding: 40px 30px;'>
                     <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px; font-weight: 700;'>Account Verification</h2>
                     <p style='color: #475569; line-height: 1.6; margin: 0 0 20px; font-size: 15px;'>Hello <strong>{$data['name']}</strong>,</p>
@@ -259,10 +267,18 @@ class AuthController
         $subject = "Verify Your Account - Ghana Highway Authority";
         $emailMessage = "
             <div style='font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
-                <div style='background-color: #1e293b; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 26px 12px; text-align: center; border-bottom: 4px solid #f59e0b;'>
-                    <h1 style='color: #ffffff !important; color: #ffffff; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; white-space: nowrap;'><span style='color: #ffffff !important; color: #ffffff;'>Ghana Highway Authority</span></h1>
-                    <p style='color: #94a3b8 !important; color: #94a3b8; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap;'><span style='color: #94a3b8 !important; color: #94a3b8;'>Asset Management System</span></p>
-                </div>
+                <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: #1e293b !important; background: #1e293b !important;'>
+                    <tr>
+                        <td bgcolor='#1e293b' align='center' style='background-color: #1e293b !important; padding: 26px 12px; border-bottom: 4px solid #f59e0b; text-align: center;'>
+                            <h1 style='color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; white-space: nowrap; font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;'>
+                                <font color='#ffffff'><span style='color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;'>Ghana Highway Authority</span></font>
+                            </h1>
+                            <p style='color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap; font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;'>
+                                <font color='#94a3b8'><span style='color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important;'>Asset Management System</span></font>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
                 <div style='padding: 40px 30px;'>
                     <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px; font-weight: 700;'>Account Verification</h2>
                     <p style='color: #475569; line-height: 1.6; margin: 0 0 20px; font-size: 15px;'>Hello <strong>{$user['name']}</strong>,</p>
@@ -379,17 +395,25 @@ class AuthController
         $resetLink = FRONTEND_URL . "/reset-password/" . $otp;
 
         // Send real email
-        $subject = "Password Reset Request - GHA Asset Manager";
+        $subject = "Password Reset Request - Ghana Highway Authority";
         $emailMessage = "
             <div style='font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
-                <div style='background-color: #1e293b; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 26px 12px; text-align: center; border-bottom: 4px solid #f59e0b;'>
-                    <h1 style='color: #ffffff !important; color: #ffffff; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; white-space: nowrap;'><span style='color: #ffffff !important; color: #ffffff;'>Ghana Highway Authority</span></h1>
-                    <p style='color: #94a3b8 !important; color: #94a3b8; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap;'><span style='color: #94a3b8 !important; color: #94a3b8;'>Asset Management System</span></p>
-                </div>
+                <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: #1e293b !important; background: #1e293b !important;'>
+                    <tr>
+                        <td bgcolor='#1e293b' align='center' style='background-color: #1e293b !important; padding: 26px 12px; border-bottom: 4px solid #f59e0b; text-align: center;'>
+                            <h1 style='color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; white-space: nowrap; font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;'>
+                                <font color='#ffffff'><span style='color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;'>Ghana Highway Authority</span></font>
+                            </h1>
+                            <p style='color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap; font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif;'>
+                                <font color='#94a3b8'><span style='color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important;'>Asset Management System</span></font>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
                 <div style='padding: 40px 30px;'>
                     <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px;'>Password Reset Request</h2>
                     <p style='color: #475569; line-height: 1.6; margin: 0 0 20px;'>Hello <strong>{$user['name']}</strong>,</p>
-                    <p style='color: #475569; line-height: 1.6; margin: 0 0 30px;'>We received a request to reset the password for your GHA Asset Manager account. Please use the verification code below to proceed:</p>
+                    <p style='color: #475569; line-height: 1.6; margin: 0 0 30px;'>We received a request to reset the password for your Ghana Highway Authority Asset Management System account. Please use the verification code below to proceed:</p>
                     
                     <div style='background-color: #f1f5f9; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 30px; border: 1px dashed #cbd5e1;'>
                         <span style='font-family: \"Courier New\", Courier, monospace; font-size: 36px; font-weight: bold; letter-spacing: 12px; color: #2563eb;'>{$otp}</span>
