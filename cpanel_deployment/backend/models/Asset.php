@@ -66,6 +66,21 @@ abstract class AssetModel
             }
         }
 
+        foreach ($processed as $k => $v) {
+            if ($v === '') {
+                $processed[$k] = null;
+            }
+        }
+
+        // Defensive validation: Ensure created_by is a valid user ID in users table, otherwise set to NULL
+        if (!empty($processed['created_by'])) {
+            $cBy = $this->db->real_escape_string($processed['created_by']);
+            $uCheck = $this->db->query("SELECT id FROM users WHERE id = '$cBy' LIMIT 1");
+            if (!$uCheck || !isset($uCheck->num_rows) || $uCheck->num_rows === 0) {
+                $processed['created_by'] = null;
+            }
+        }
+
         return $processed;
     }
 

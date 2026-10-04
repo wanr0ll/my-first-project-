@@ -328,7 +328,9 @@ class AssetController
                 }
 
                 // Add creator info
-                $assetData['createdBy'] = $user['name'] ?? $user['email'] ?? 'System';
+                $assetData['createdBy'] = $user['id'];
+                $assetData['created_by'] = $user['id'];
+                $creatorName = $user['name'] ?? $user['email'] ?? 'System';
 
                 // Force approval status to Pending
                 $assetData['approvalStatus'] = 'Pending';
@@ -351,7 +353,7 @@ class AssetController
                             $result['id'],
                             $assetData['asset_type'] ?? 'Asset',
                             'Asset Bulk Imported',
-                            "Asset '{$assetData['name']}' was bulk imported by {$assetData['createdBy']}",
+                            "Asset '{$assetData['name']}' was bulk imported by {$creatorName}",
                             $user['id']
                         );
                     }

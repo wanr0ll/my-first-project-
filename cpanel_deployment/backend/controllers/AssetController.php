@@ -79,7 +79,9 @@ class AssetController
         }
 
         // Add creator info
-        $data['createdBy'] = $user['name'] ?? $user['email'] ?? 'System';
+        $data['createdBy'] = $user['id'];
+        $data['created_by'] = $user['id'];
+        $creatorName = $user['name'] ?? $user['email'] ?? 'System';
 
         $result = $this->assetModel->create($data);
 
@@ -89,14 +91,14 @@ class AssetController
                     $result['id'],
                     $data['asset_type'] ?? 'Asset',
                     'Asset Registered',
-                    "New asset '{$data['name']}' was registered by {$data['createdBy']}",
+                    "New asset '{$data['name']}' was registered by {$creatorName}",
                     $user['id']
                 );
             }
             if ($this->notificationModel) {
                 $this->notificationModel->notifyAdmins(
                     'New Asset Registered',
-                    "Asset '{$data['name']}' was added to the system by {$data['createdBy']}.",
+                    "Asset '{$data['name']}' was added to the system by {$creatorName}.",
                     'success',
                     $result['id']
                 );
@@ -291,7 +293,9 @@ class AssetController
                 }
 
                 // Add creator info
-                $assetData['createdBy'] = $user['name'] ?? $user['email'] ?? 'System';
+                $assetData['createdBy'] = $user['id'];
+                $assetData['created_by'] = $user['id'];
+                $creatorName = $user['name'] ?? $user['email'] ?? 'System';
 
                 $result = $this->assetModel->create($assetData);
 
@@ -302,7 +306,7 @@ class AssetController
                             $result['id'],
                             $assetData['asset_type'] ?? 'Asset',
                             'Asset Bulk Imported',
-                            "Asset '{$assetData['name']}' was bulk imported by {$assetData['createdBy']}",
+                            "Asset '{$assetData['name']}' was bulk imported by {$creatorName}",
                             $user['id']
                         );
                     }
