@@ -83,7 +83,7 @@ define('DEBUG_MODE', (($_SERVER['APP_ENVIRONMENT'] ?? $_ENV['APP_ENVIRONMENT'] ?
 // Email Configuration (Brevo HTTP API - replaces blocked SMTP on Railway)
 define('BREVO_API_KEY', ($_SERVER['BREVO_API_KEY'] ?? $_ENV['BREVO_API_KEY'] ?? getenv('BREVO_API_KEY')) ?: '');
 define('SMTP_FROM', 'ghaassetmanagementsystem@gmail.com');
-define('SMTP_FROM_NAME', 'GHA Asset Manager');
+define('SMTP_FROM_NAME', 'Ghana Highway Authority');
 
 // Ensure logs and uploads directories exist
 if (!is_dir(__DIR__ . '/../logs/')) {

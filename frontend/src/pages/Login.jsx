@@ -273,10 +273,14 @@ const Login = () => {
                                                 type="button"
                                                 onClick={handleVerification}
                                                 disabled={isLoading || verificationOtp.length !== 6}
-                                                className="w-full bg-gradient-to-r from-primary to-primary-light hover:to-primary-dark text-text-primary font-bold py-4 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center gap-3 shadow-xl shadow-primary/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="w-full bg-gradient-to-r from-primary to-primary-light hover:to-primary-dark text-white font-bold py-4 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center gap-3 shadow-xl shadow-primary/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                {isLoading ? 'Verifying...' : 'Verify & Login'}
-                                                {!isLoading && <ArrowRight size={20} />}
+                                                {isLoading ? (
+                                                    <span className="text-white">Verifying...</span>
+                                                ) : (
+                                                    <span className="text-white font-bold">Verify & Login</span>
+                                                )}
+                                                {!isLoading && <ArrowRight size={20} className="text-white" />}
                                             </button>
                                             <div className="text-center">
                                                 <p className="text-[10px] text-text-muted">
@@ -303,17 +307,17 @@ const Login = () => {
                                         <button
                                             type="submit"
                                             disabled={isLoading}
-                                            className="w-full bg-gradient-to-r from-primary to-primary-light hover:to-primary-dark text-text-primary font-bold py-4 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center gap-3 shadow-xl shadow-primary/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="w-full bg-gradient-to-r from-primary to-primary-light hover:to-primary-dark text-white font-bold py-4 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center gap-3 shadow-xl shadow-primary/20 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {isLoading ? (
                                                 <>
-                                                    <div className="w-4 h-4 border-2 border-text-primary/30 border-t-text-primary rounded-full animate-spin"></div>
-                                                    Logging in...
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                    <span className="text-white font-bold">Logging in...</span>
                                                 </>
                                             ) : (
                                                 <>
-                                                    Login
-                                                    <ArrowRight size={0} />
+                                                    <span className="text-white font-bold text-base">Login</span>
+                                                    <ArrowRight size={18} className="text-white" />
                                                 </>
                                             )}
                                         </button>

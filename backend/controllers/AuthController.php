@@ -107,18 +107,33 @@ class AuthController
         $this->userModel->setVerificationToken($data['email'], $otp);
 
         // Send Verification Email
-        $subject = "Verify Your Account - GHA Asset Manager";
+        $subject = "Verify Your Account - Ghana Highway Authority";
         $emailMessage = "
-            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;'>
-                <h2 style='color: #2c3e50;'>Welcome to GHA Asset Manager</h2>
-                <p>Hello {$data['name']},</p>
-                <p>Thank you for registering. Please use the verification code below to activate your account:</p>
-                <div style='background: #f8f9fa; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #3498db; border-radius: 5px; margin: 20px 0;'>
-                    {$otp}
+            <div style='font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+                <div style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 30px; text-align: center; border-bottom: 4px solid #f59e0b;'>
+                    <h1 style='color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;'>Ghana Highway Authority</h1>
+                    <p style='color: #94a3b8; margin: 5px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase;'>Asset Management System</p>
                 </div>
-                <p style='color: #7f8c8d; font-size: 12px;'>If you did not create an account, please ignore this email.</p>
-                <hr style='border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;'>
-                <p style='color: #bdc3c7; font-size: 10px;'>This is an automated message from Ghana Highway Authority Asset Management System.</p>
+                <div style='padding: 40px 30px;'>
+                    <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px; font-weight: 700;'>Account Verification</h2>
+                    <p style='color: #475569; line-height: 1.6; margin: 0 0 20px; font-size: 15px;'>Hello <strong>{$data['name']}</strong>,</p>
+                    <p style='color: #475569; line-height: 1.6; margin: 0 0 30px; font-size: 15px;'>Thank you for registering with the Ghana Highway Authority Asset Management System. Please use the verification code below to activate your account:</p>
+                    
+                    <div style='background-color: #f1f5f9; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 30px; border: 1px dashed #cbd5e1;'>
+                        <span style='font-family: \"Courier New\", Courier, monospace; font-size: 36px; font-weight: bold; letter-spacing: 12px; color: #2563eb;'>{$otp}</span>
+                    </div>
+
+                    <p style='color: #64748b; font-size: 14px; margin: 0 0 10px;'>This code will expire in <strong>24 hours</strong>.</p>
+                    <p style='color: #64748b; font-size: 14px; margin: 0;'>If you did not create an account, please ignore this email.</p>
+                </div>
+                <div style='background-color: #f8fafc; padding: 25px 30px; border-top: 1px solid #e2e8f0; text-align: center;'>
+                    <p style='color: #94a3b8; font-size: 12px; margin: 0 0 10px;'>&copy; " . date('Y') . " Ghana Highway Authority. All rights reserved.</p>
+                    <p style='color: #94a3b8; font-size: 11px; margin: 0; line-height: 1.4;'>
+                        Head Office, P.O. Box GP 1641, Accra - Ghana<br>
+                        Digital Address: GA-107-2101<br>
+                        This is an automated message, please do not reply.
+                    </p>
+                </div>
             </div>
         ";
 
@@ -246,18 +261,33 @@ class AuthController
         $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $this->userModel->setVerificationToken($user['email'], $otp);
 
-        $subject = "Verify Your Account - GHA Asset Manager";
+        $subject = "Verify Your Account - Ghana Highway Authority";
         $emailMessage = "
-            <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;'>
-                <h2 style='color: #2c3e50;'>Welcome to GHA Asset Manager</h2>
-                <p>Hello {$user['name']},</p>
-                <p>You requested a new verification code. Please use the code below to activate your account:</p>
-                <div style='background: #f8f9fa; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #3498db; border-radius: 5px; margin: 20px 0;'>
-                    {$otp}
+            <div style='font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+                <div style='background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 30px; text-align: center; border-bottom: 4px solid #f59e0b;'>
+                    <h1 style='color: #ffffff; margin: 0; font-size: 22px; letter-spacing: 2px; text-transform: uppercase; font-weight: 800;'>Ghana Highway Authority</h1>
+                    <p style='color: #94a3b8; margin: 5px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase;'>Asset Management System</p>
                 </div>
-                <p style='color: #7f8c8d; font-size: 12px;'>If you did not request this, please ignore this email.</p>
-                <hr style='border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;'>
-                <p style='color: #bdc3c7; font-size: 10px;'>This is an automated message from Ghana Highway Authority Asset Management System.</p>
+                <div style='padding: 40px 30px;'>
+                    <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px; font-weight: 700;'>Account Verification</h2>
+                    <p style='color: #475569; line-height: 1.6; margin: 0 0 20px; font-size: 15px;'>Hello <strong>{$user['name']}</strong>,</p>
+                    <p style='color: #475569; line-height: 1.6; margin: 0 0 30px; font-size: 15px;'>You requested a new verification code for your Ghana Highway Authority Asset Management System account. Please use the code below to proceed:</p>
+                    
+                    <div style='background-color: #f1f5f9; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 30px; border: 1px dashed #cbd5e1;'>
+                        <span style='font-family: \"Courier New\", Courier, monospace; font-size: 36px; font-weight: bold; letter-spacing: 12px; color: #2563eb;'>{$otp}</span>
+                    </div>
+
+                    <p style='color: #64748b; font-size: 14px; margin: 0 0 10px;'>This code will expire in <strong>24 hours</strong>.</p>
+                    <p style='color: #64748b; font-size: 14px; margin: 0;'>If you did not request this code, please ignore this email.</p>
+                </div>
+                <div style='background-color: #f8fafc; padding: 25px 30px; border-top: 1px solid #e2e8f0; text-align: center;'>
+                    <p style='color: #94a3b8; font-size: 12px; margin: 0 0 10px;'>&copy; " . date('Y') . " Ghana Highway Authority. All rights reserved.</p>
+                    <p style='color: #94a3b8; font-size: 11px; margin: 0; line-height: 1.4;'>
+                        Head Office, P.O. Box GP 1641, Accra - Ghana<br>
+                        Digital Address: GA-107-2101<br>
+                        This is an automated message, please do not reply.
+                    </p>
+                </div>
             </div>
         ";
 

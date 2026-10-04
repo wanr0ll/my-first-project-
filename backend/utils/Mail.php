@@ -26,7 +26,7 @@ class Mail
 
         $payload = json_encode([
             'sender' => [
-                'name'  => defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'GHA Asset Manager',
+                'name'  => defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Ghana Highway Authority',
                 'email' => defined('SMTP_FROM')      ? SMTP_FROM      : 'ghaassetmanagementsystem@gmail.com',
             ],
             'to' => [
