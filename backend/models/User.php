@@ -21,22 +21,22 @@ class User
         $id = isset($data['id']) ? $data['id'] : generateId('USR');
         $password = hashPassword($data['password']);
 
+        $phone = $data['phone'] ?? null;
+        $division = $data['division'] ?? null;
+        $status = $data['status'] ?? 'pending';
+        $email_verified_sql = (!empty($data['email_verified']) && ($data['email_verified'] === true || $data['email_verified'] == 1 || $data['email_verified'] === 'true' || $data['email_verified'] === 't')) ? 'TRUE' : 'FALSE';
+
+        $position = $data['position'] ?? null;
+
         $query = "INSERT INTO users 
                   (id, name, email, password, phone, role, position, division, status, email_verified) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, $email_verified_sql)";
 
         $stmt = $this->db->prepare($query);
 
         if (!$stmt) {
             return ['success' => false, 'message' => 'Prepare failed: ' . $this->db->error];
         }
-
-        $phone = $data['phone'] ?? null;
-        $division = $data['division'] ?? null;
-        $status = $data['status'] ?? 'pending';
-        $email_verified = $data['email_verified'] ?? 0;
-
-        $position = $data['position'] ?? null;
 
         $params = [
             $id,
@@ -47,8 +47,7 @@ class User
             $data['role'],
             $position,
             $division,
-            $status,
-            $email_verified
+            $status
         ];
 
         if ($stmt->execute($params)) {
@@ -345,7 +344,7 @@ class User
         $expiry = date('Y-m-d H:i:s', strtotime('+30 minutes'));
 
         // Mark email as verified (but keep status as pending until password is set)
-        $query = "UPDATE users SET email_verified = 1, verification_token = NULL, verification_token_expiry = NULL, reset_token = ?, reset_token_expiry = ? WHERE id = ?";
+        $query = "UPDATE users SET email_verified = TRUE, verification_token = NULL, verification_token_expiry = NULL, reset_token = ?, reset_token_expiry = ? WHERE id = ?";
         $stmt = $this->db->prepare($query);
 
         if ($stmt->execute([$setPasswordToken, $expiry, $user['id']])) {
