@@ -97,12 +97,10 @@ const ImageCropper = ({ imageSrc, onCropComplete, onCancel }) => {
             image.height * scale * scaleFactor
         );
         
-        cropCanvas.toBlob((blob) => {
-            if (blob) {
-                const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-                onCropComplete(file);
-            }
-        }, 'image/jpeg', 0.9);
+        // Output as base64 data URL so we can store it in the DB (no filesystem dependency)
+        const dataUrl = cropCanvas.toDataURL('image/jpeg', 0.85);
+        onCropComplete(dataUrl);
+
     };
 
     return (

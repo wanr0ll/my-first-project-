@@ -407,22 +407,20 @@ export async function pingUser() {
 }
 
 /**
- * Upload profile image
+ * Upload profile image (base64 stored in DB — no filesystem dependency)
  */
-export async function uploadProfileImage(file) {
+export async function uploadProfileImage(base64DataUrl) {
     const token = localStorage.getItem('auth_token');
-    const formData = new FormData();
-    formData.append('profile_image', file);
-
     const baseUrl = await resolveBaseUrl();
     const url = `${baseUrl}?request=users/upload_profile`;
 
     const response = await fetch(url, {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify({ profile_image: base64DataUrl })
     });
 
     if (!response.ok) {
@@ -438,6 +436,7 @@ export async function uploadProfileImage(file) {
 
     return response.json();
 }
+
 
 // ============ ASSET ENDPOINTS ============
 

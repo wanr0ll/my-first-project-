@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     division VARCHAR(100),
     status VARCHAR(20) DEFAULT 'active',
     email_verified BOOLEAN DEFAULT FALSE,
-    profile_image VARCHAR(255),
+    profile_image TEXT,
     permissions JSONB DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -490,17 +490,16 @@ const Settings = () => {
                         <ImageCropper 
                             imageSrc={selectedImageForCrop}
                             onCancel={() => setSelectedImageForCrop(null)}
-                            onCropComplete={async (croppedFile) => {
+                            onCropComplete={async (base64DataUrl) => {
                                 try {
                                     const { uploadProfileImage } = await import('../services/api');
-                                    const res = await uploadProfileImage(croppedFile);
+                                    const res = await uploadProfileImage(base64DataUrl);
                                     if (res.success && res.data) {
-                                        // Add timestamp to bust cache
-                                        const pathWithTimestamp = `${res.data.profile_image.split('?')[0]}?t=${new Date().getTime()}`;
-                                        const newUrl = getFullImageUrl(pathWithTimestamp);
+                                        // profile_image is now a base64 data URL — use directly
+                                        const newUrl = res.data.profile_image;
                                         setAvatarUrl(newUrl);
                                         if (updateProfile) {
-                                            updateProfile({ ...user, profile_image: pathWithTimestamp });
+                                            updateProfile({ ...user, profile_image: newUrl });
                                         }
                                         addToast('Profile picture updated successfully!', 'success');
                                         setIsAvatarModalOpen(false);
@@ -510,6 +509,7 @@ const Settings = () => {
                                     addToast(error.message || 'Upload failed', 'error');
                                 }
                             }}
+
                         />
                     ) : (
                         <div className="flex flex-col items-center gap-6">

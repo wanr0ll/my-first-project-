@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
     division VARCHAR(100),
     status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
     email_verified BOOLEAN DEFAULT FALSE,
-    profile_image VARCHAR(255),
+    profile_image MEDIUMTEXT,
     permissions JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

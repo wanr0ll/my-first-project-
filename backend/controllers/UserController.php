@@ -147,57 +147,40 @@ class UserController
     }
 
     /**
-     * Upload profile image
+     * Upload profile image (stored as base64 in DB — no filesystem required)
      */
     public function uploadProfileImage()
     {
         $user = Middleware::requireAuth();
         $id = $user['id'];
 
-        if (!isset($_FILES['profile_image']) || $_FILES['profile_image']['error'] !== UPLOAD_ERR_OK) {
-            Response::error('No valid file uploaded', 400);
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        if (empty($data['profile_image']) || !is_string($data['profile_image'])) {
+            Response::error('No valid image data provided', 400);
+            return;
         }
 
-        $file = $_FILES['profile_image'];
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        $base64 = $data['profile_image'];
 
-        if (!in_array($file['type'], $allowedTypes)) {
-            Response::error('Only JPG, PNG and GIF files are allowed', 400);
+        // Validate it is a JPEG or PNG data URL
+        if (!preg_match('/^data:image\/(jpeg|png|gif|webp);base64,/', $base64)) {
+            Response::error('Invalid image format. Only JPEG, PNG, GIF, or WebP allowed.', 400);
+            return;
         }
 
-        if ($file['size'] > 5 * 1024 * 1024) { // 5MB limit
-            Response::error('File size exceeds 5MB limit', 400);
+        // Rough size check: base64 adds ~33% overhead; 5MB raw ≈ ~6.8MB base64
+        if (strlen($base64) > 7 * 1024 * 1024) {
+            Response::error('Image exceeds 5MB limit', 400);
+            return;
         }
 
-        $uploadDir = __DIR__ . '/../uploads/profiles/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
-        }
+        $result = $this->userModel->update($id, ['profile_image' => $base64]);
 
-        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-        $filename = 'profile_' . $id . '_' . time() . '.' . $ext;
-        $destination = $uploadDir . $filename;
-
-        if (move_uploaded_file($file['tmp_name'], $destination)) {
-            $imageUrl = '/uploads/profiles/' . $filename;
-
-            $oldProfile = $this->userModel->getById($id);
-            if (!empty($oldProfile['profile_image'])) {
-                $oldPath = __DIR__ . '/..' . $oldProfile['profile_image'];
-                if (file_exists($oldPath) && !is_dir($oldPath)) {
-                    unlink($oldPath);
-                }
-            }
-
-            $result = $this->userModel->update($id, ['profile_image' => $imageUrl]);
-
-            if ($result['success']) {
-                Response::success(['profile_image' => $imageUrl], 'Profile image uploaded successfully');
-            } else {
-                Response::error('Failed to update database', 500);
-            }
+        if ($result['success']) {
+            Response::success(['profile_image' => $base64], 'Profile image uploaded successfully');
         } else {
-            Response::error('Failed to move uploaded file', 500);
+            Response::error('Failed to update database', 500);
         }
     }
 
