@@ -42,30 +42,22 @@ class Database
             return;
         }
 
-        // 2. Check explicit DB_DRIVER env variable ('pgsql' or 'mysql')
+        // 2. Check explicit DB_DRIVER env variable (only 'pgsql' supported)
         $driver_env = strtolower($_SERVER['DB_DRIVER'] ?? $_ENV['DB_DRIVER'] ?? getenv('DB_DRIVER') ?: '');
-        
-        // Check for Postgres specific environment variables
-        $pg_host = $_SERVER['PGHOST'] ?? $_ENV['PGHOST'] ?? getenv('PGHOST') 
+
+        // Check for Postgres specific environment variables (Supabase, Render, etc.)
+        $pg_host = $_SERVER['PGHOST'] ?? $_ENV['PGHOST'] ?? getenv('PGHOST')
             ?? $_SERVER['POSTGRES_HOST'] ?? $_ENV['POSTGRES_HOST'] ?? getenv('POSTGRES_HOST') ?: null;
 
-        if ($driver_env === 'pgsql' || ($driver_env === '' && $pg_host !== null)) {
-            $this->driver  = 'pgsql';
-            $this->host    = $pg_host ?: 'localhost';
-            $this->user    = $_SERVER['PGUSER'] ?? $_ENV['PGUSER'] ?? getenv('PGUSER') ?? $_SERVER['POSTGRES_USER'] ?? $_ENV['POSTGRES_USER'] ?? getenv('POSTGRES_USER') ?: 'postgres';
-            $this->pass    = $_SERVER['PGPASSWORD'] ?? $_ENV['PGPASSWORD'] ?? getenv('PGPASSWORD') ?? $_SERVER['POSTGRES_PASSWORD'] ?? $_ENV['POSTGRES_PASSWORD'] ?? getenv('POSTGRES_PASSWORD') ?: '';
-            $this->db_name = $_SERVER['PGDATABASE'] ?? $_ENV['PGDATABASE'] ?? getenv('PGDATABASE') ?? $_SERVER['POSTGRES_DB'] ?? $_ENV['POSTGRES_DB'] ?? getenv('POSTGRES_DB') ?: 'gha_asset_manager';
-            $this->port    = (int)($_SERVER['PGPORT'] ?? $_ENV['PGPORT'] ?? getenv('PGPORT') ?? $_SERVER['POSTGRES_PORT'] ?? $_ENV['POSTGRES_PORT'] ?? getenv('POSTGRES_PORT') ?: 5432);
-        } else {
-            // Fall back to MySQL credentials if DB_DRIVER=mysql or MYSQLHOST is set
-            $this->driver  = 'mysql';
-            $this->host    = $_SERVER['MYSQLHOST'] ?? $_ENV['MYSQLHOST'] ?? getenv('MYSQLHOST') ?? (defined('DB_HOST') ? DB_HOST : 'localhost');
-            $this->user    = $_SERVER['MYSQLUSER'] ?? $_ENV['MYSQLUSER'] ?? getenv('MYSQLUSER') ?? (defined('DB_USER') ? DB_USER : 'root');
-            $this->pass    = $_SERVER['MYSQLPASSWORD'] ?? $_ENV['MYSQLPASSWORD'] ?? getenv('MYSQLPASSWORD') ?? (defined('DB_PASS') ? DB_PASS : '');
-            $this->db_name = $_SERVER['MYSQLDATABASE'] ?? $_ENV['MYSQLDATABASE'] ?? getenv('MYSQLDATABASE') ?? $_SERVER['MYSQL_DATABASE'] ?? $_ENV['MYSQL_DATABASE'] ?? getenv('MYSQL_DATABASE') ?? (defined('DB_NAME') ? DB_NAME : 'gha_asset_manager');
-            $this->port    = (int)($_SERVER['MYSQLPORT'] ?? $_ENV['MYSQLPORT'] ?? getenv('MYSQLPORT') ?: 3306);
-        }
+        // Default to PostgreSQL — no MySQL support
+        $this->driver  = 'pgsql';
+        $this->host    = $pg_host ?: 'localhost';
+        $this->user    = $_SERVER['PGUSER'] ?? $_ENV['PGUSER'] ?? getenv('PGUSER') ?? $_SERVER['POSTGRES_USER'] ?? $_ENV['POSTGRES_USER'] ?? getenv('POSTGRES_USER') ?: 'postgres';
+        $this->pass    = $_SERVER['PGPASSWORD'] ?? $_ENV['PGPASSWORD'] ?? getenv('PGPASSWORD') ?? $_SERVER['POSTGRES_PASSWORD'] ?? $_ENV['POSTGRES_PASSWORD'] ?? getenv('POSTGRES_PASSWORD') ?: '';
+        $this->db_name = $_SERVER['PGDATABASE'] ?? $_ENV['PGDATABASE'] ?? getenv('PGDATABASE') ?? $_SERVER['POSTGRES_DB'] ?? $_ENV['POSTGRES_DB'] ?? getenv('POSTGRES_DB') ?: 'gha_asset_manager';
+        $this->port    = (int)($_SERVER['PGPORT'] ?? $_ENV['PGPORT'] ?? getenv('PGPORT') ?? $_SERVER['POSTGRES_PORT'] ?? $_ENV['POSTGRES_PORT'] ?? getenv('POSTGRES_PORT') ?: 5432);
     }
+
 
     public function connect()
     {

@@ -1,7 +1,23 @@
 # Local Netlify folder
 .netlify
+
+# Environment files — never commit secrets
 .env
 backend/.env
+frontend/.env
+frontend/.env.local
+
+# Node modules
 node_modules
+frontend/node_modules
+
+# Build artifacts
+frontend/dist
+dist
+
+# Logs
 *.log
 
+# OS files
+.DS_Store
+Thumbs.db

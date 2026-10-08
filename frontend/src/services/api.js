@@ -1,14 +1,15 @@
 /**
  * API Service - Handles all API calls to the PHP backend
+ * Production: Backend on Render, DB on Supabase PostgreSQL, Frontend on Netlify
+ * Development: Local XAMPP (PHP + PostgreSQL)
  */
 
-const PROD_BACKEND_FALLBACK = 'https://my-first-project-production-e47d.up.railway.app/api/index.php';
-
-// In production, use VITE_API_URL (Railway/Render). In dev, use Vite proxy.
+// In production, VITE_API_URL must be set in Netlify environment variables
+// pointing to your Render backend, e.g. https://your-app.onrender.com/api/index.php
 const CONFIGURED_BASE = import.meta.env.VITE_API_URL
-    || (import.meta.env.DEV ? '/api/index.php' : PROD_BACKEND_FALLBACK);
+    || (import.meta.env.DEV ? '/api/index.php' : '');
 
-// Only try localhost fallbacks in development (avoids mixed-content errors on mobile in prod)
+// Only try localhost fallbacks in development
 const BASE_URL_CANDIDATES = import.meta.env.DEV
     ? [
         CONFIGURED_BASE,
@@ -18,24 +19,25 @@ const BASE_URL_CANDIDATES = import.meta.env.DEV
         'http://127.0.0.1/gha-asset-manager/backend/api/index.php',
         'http://127.0.0.1/backend/api/index.php',
     ].filter(Boolean)
-    : [CONFIGURED_BASE, PROD_BACKEND_FALLBACK].filter(Boolean);
+    : [CONFIGURED_BASE].filter(Boolean);
+
 
 let resolvedBaseUrl = null;
 
 export function getBaseUrlSync() {
     let base = resolvedBaseUrl || import.meta.env.VITE_API_URL || CONFIGURED_BASE;
     if (!base || base.startsWith('/api')) {
-        if (import.meta.env.DEV) {
-            base = 'http://localhost/gha-asset-manager/backend';
-        } else {
-            base = PROD_BACKEND_FALLBACK;
-        }
+        // In dev fallback to localhost; in prod VITE_API_URL must be set
+        base = import.meta.env.DEV
+            ? 'http://localhost/gha-asset-manager/backend'
+            : '';
     }
-    // Remove /api/index.php or /api if it's there to get the root directory for uploads
+    // Remove /api/index.php or /api suffix to get the root URL for image paths
     base = base.replace(/\/api\/index\.php$/, '').replace(/\/api$/, '');
     // Ensure it doesn't end with a slash
     return base.replace(/\/$/, '');
 }
+
 
 /**
  * Returns a fully-qualified image URL for user profile photos, receipts, or uploaded assets.
