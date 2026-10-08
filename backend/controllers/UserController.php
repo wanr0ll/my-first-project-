@@ -180,9 +180,12 @@ class UserController
         if ($result['success']) {
             Response::success(['profile_image' => $base64], 'Profile image uploaded successfully');
         } else {
-            Response::error('Failed to update database', 500);
+            // Return the actual DB error to help diagnose (column size, constraint, etc.)
+            $errMsg = isset($result['message']) ? $result['message'] : 'Unknown DB error';
+            Response::error('Failed to update database: ' . $errMsg, 500);
         }
     }
+
 
     /**
      * Ping endpoint to update last active timestamp
