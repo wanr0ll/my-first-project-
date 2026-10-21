@@ -1,7 +1,7 @@
 # render.yaml — Render deployment configuration
 # Docs: https://render.com/docs/render-yaml-spec
 #
-# Stack: PHP backend on Render (Docker) + Supabase PostgreSQL + Netlify frontend
+# Stack: Node.js (JavaScript) backend on Render (Docker) + Supabase PostgreSQL + Netlify frontend
 
 services:
   - type: web

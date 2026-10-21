@@ -9,10 +9,12 @@
 const CONFIGURED_BASE = import.meta.env.VITE_API_URL
     || (import.meta.env.DEV ? '/api/index.php' : '');
 
-// Only try localhost fallbacks in development
 const BASE_URL_CANDIDATES = import.meta.env.DEV
     ? [
         CONFIGURED_BASE,
+        'http://localhost:5000',
+        'http://localhost:5000/api',
+        'http://127.0.0.1:5000',
         '/api/index.php',
         'http://localhost/gha-asset-manager/backend/api/index.php',
         'http://localhost/backend/api/index.php',
