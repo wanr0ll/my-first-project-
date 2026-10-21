@@ -145,10 +145,20 @@ class APIClient {
         // Parse endpoint to separate base path and query parameters
         const [basePath, queryPart] = endpoint.split('?');
 
-        // Build URL with request parameter and any additional query params
-        const url = queryPart
-            ? `${baseUrl}?request=${basePath}&${queryPart}`
-            : `${baseUrl}?request=${basePath}`;
+        let url;
+        if (baseUrl.includes('supabase.co/functions') || baseUrl.includes('localhost:5000')) {
+            const cleanBase = baseUrl.replace(/\/$/, '');
+            const cleanEndpoint = endpoint.replace(/^\//, '');
+            url = `${cleanBase}/${cleanEndpoint}`;
+        } else if (baseUrl.includes('index.php')) {
+            url = queryPart
+                ? `${baseUrl}?request=${basePath}&${queryPart}`
+                : `${baseUrl}?request=${basePath}`;
+        } else {
+            url = queryPart
+                ? `${baseUrl}?request=${basePath}&${queryPart}`
+                : `${baseUrl}?request=${basePath}`;
+        }
 
         const headers = {
             'Content-Type': 'application/json',

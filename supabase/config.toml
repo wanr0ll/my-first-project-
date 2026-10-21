@@ -1,0 +1,10 @@
+# Supabase CLI Configuration
+project_id = "gha_asset_manager"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[functions.api]
+verify_jwt = false
