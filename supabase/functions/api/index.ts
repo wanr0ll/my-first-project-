@@ -1,5 +1,5 @@
-import { Hono } from "jsr:@hono/hono";
-import { cors } from "jsr:@hono/hono/cors";
+import { Hono } from "npm:hono";
+import { cors } from "npm:hono/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import bcrypt from "npm:bcryptjs";
 import jwt from "npm:jsonwebtoken";
@@ -365,6 +365,17 @@ app.put("/users", async (c) => {
     if (body.position !== undefined) updates.position = body.position;
     if (body.phone !== undefined) updates.phone = body.phone;
     if (body.status !== undefined) updates.status = body.status;
+    if (body.permissions !== undefined) {
+        if (typeof body.permissions === "string") {
+            try {
+                updates.permissions = JSON.parse(body.permissions);
+            } catch {
+                updates.permissions = body.permissions;
+            }
+        } else {
+            updates.permissions = body.permissions;
+        }
+    }
     if (body.password) updates.password = bcrypt.hashSync(body.password, 10);
     updates.updated_at = new Date().toISOString();
 

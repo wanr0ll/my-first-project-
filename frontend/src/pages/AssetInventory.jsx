@@ -1168,7 +1168,33 @@ const AssetInventory = () => {
                                 >
                                     <Printer size={15} /> Print Details
                                 </button>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedAsset?.approval_status === 'Pending' && permissions.canApproveAsset(user, selectedAsset) && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    await handleApprove(selectedAsset);
+                                                    setIsDetailModalOpen(false);
+                                                }}
+                                                className="px-4 py-2 bg-success text-white rounded-lg text-sm font-bold shadow-lg shadow-success/20 flex items-center gap-2 hover:bg-success/90 transition-all active:scale-95"
+                                                title="Approve this asset"
+                                            >
+                                                <Check size={16} strokeWidth={2.5} /> Approve Asset
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    await handleReject(selectedAsset);
+                                                    setIsDetailModalOpen(false);
+                                                }}
+                                                className="px-4 py-2 bg-danger/10 text-danger border border-danger/30 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-danger hover:text-white transition-all active:scale-95"
+                                                title="Reject this asset"
+                                            >
+                                                <X size={16} strokeWidth={2.5} /> Reject Asset
+                                            </button>
+                                        </>
+                                    )}
                                     {permissions.canTransferAssets(user) && (
                                         <button
                                             onClick={() => { setIsDetailModalOpen(false); setIsTransferModalOpen(true); }}

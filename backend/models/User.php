@@ -148,6 +148,9 @@ class User
 
         foreach ($data as $key => $value) {
             if (in_array($key, ['name', 'phone', 'role', 'position', 'division', 'status', 'profile_image', 'permissions'])) {
+                if ($key === 'permissions' && (is_array($value) || is_object($value))) {
+                    $value = json_encode($value);
+                }
                 $updates[] = "$key = ?";
                 $params[] = $value;
                 $types .= 's';

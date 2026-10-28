@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Check, X, Trash2, Search, Filter, Shield, User, Mail, MoreVertical, Edit2, Save, Clock, Plus, Send, Package, Phone, Calendar, Hash, Key } from 'lucide-react';
+import { Users, Check, X, Trash2, Search, Filter, Shield, User, Mail, MoreVertical, Edit2, Save, Clock, Plus, Send, Package, Phone, Calendar, Hash, Key, CheckCircle2, RotateCcw, CheckCheck, Minus, Sliders } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import Modal from '../components/Modal';
@@ -555,66 +555,248 @@ const UserManagement = () => {
                                 </div>
                             </div>
                             {/* ── Custom Permissions Panel ── */}
-                            <div className="space-y-3 pt-2">
-                                <div className="flex items-center gap-2 pb-1">
-                                    <Shield size={14} className="text-primary" />
-                                    <span className="text-sm font-bold text-text-primary">Custom Permissions</span>
-                                    <span className="ml-auto text-[10px] text-text-muted font-medium">Overrides role defaults · Click to cycle</span>
+                            <div className="space-y-3 pt-3 border-t border-border-color">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                            <Shield size={14} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-text-primary">Custom User Permissions</span>
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                                    Granular Access
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-text-muted font-medium">Fine-tune individual permissions to override role defaults.</p>
+                                        </div>
+                                    </div>
+                                    {/* Quick Actions */}
+                                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const allAllowed = {};
+                                                [
+                                                    'canApproveAsset', 'canAddAsset', 'canEditAsset', 'canTransferAssets',
+                                                    'canArchiveAsset', 'canRestoreAsset', 'canScheduleMaintenance',
+                                                    'canAssignTasks', 'canViewHistory', 'canViewDetails'
+                                                ].forEach(k => { allAllowed[k] = true; });
+                                                setEditFormData(prev => ({
+                                                    ...prev,
+                                                    permissions: allAllowed
+                                                }));
+                                            }}
+                                            className="px-2 py-1 rounded-md text-[10px] font-bold bg-success/10 text-success hover:bg-success hover:text-white transition-all flex items-center gap-1"
+                                            title="Grant all permissions to this user"
+                                        >
+                                            <CheckCheck size={12} /> Allow All
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setEditFormData(prev => ({
+                                                    ...prev,
+                                                    permissions: {}
+                                                }));
+                                            }}
+                                            className="px-2 py-1 rounded-md text-[10px] font-bold bg-bg-card border border-border-color text-text-muted hover:text-text-primary hover:border-text-primary/30 transition-all flex items-center gap-1"
+                                            title="Reset all permissions to role defaults"
+                                        >
+                                            <RotateCcw size={11} /> Reset Defaults
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const allDenied = {};
+                                                [
+                                                    'canApproveAsset', 'canAddAsset', 'canEditAsset', 'canTransferAssets',
+                                                    'canArchiveAsset', 'canRestoreAsset', 'canScheduleMaintenance',
+                                                    'canAssignTasks', 'canViewHistory', 'canViewDetails'
+                                                ].forEach(k => { allDenied[k] = false; });
+                                                setEditFormData(prev => ({
+                                                    ...prev,
+                                                    permissions: allDenied
+                                                }));
+                                            }}
+                                            className="px-2 py-1 rounded-md text-[10px] font-bold bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center gap-1"
+                                            title="Deny all permissions for this user"
+                                        >
+                                            <X size={12} /> Deny All
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
                                     {[
-                                        { key: 'canAddAsset',      label: 'Add Assets',      desc: 'Create new asset records' },
-                                        { key: 'canEditAsset',     label: 'Edit Assets',     desc: 'Modify existing asset data' },
-                                        { key: 'canApproveAsset',  label: 'Approve Assets',  desc: 'Approve pending submissions' },
-                                        { key: 'canArchiveAsset',  label: 'Archive Assets',  desc: 'Archive or dispose of assets' },
-                                        { key: 'canRestoreAsset',  label: 'Restore Assets',  desc: 'Restore archived assets' },
-                                        { key: 'canTransferAssets',label: 'Transfer Assets', desc: 'Transfer assets between divisions' },
-                                        { key: 'canViewHistory',   label: 'View History',    desc: 'Access asset activity logs' },
-                                        { key: 'canViewDetails',   label: 'View Details',    desc: 'View full asset detail records' },
-                                    ].map(({ key, label, desc }) => {
-                                        const val = editFormData.permissions[key];
-                                        const isGranted = val === true;
-                                        const isDenied  = val === false;
-                                        const isDefault = val === null || val === undefined;
-                                        const cycle = () => {
-                                            const next = isDefault ? true : isGranted ? false : null;
-                                            setEditFormData(prev => ({
-                                                ...prev,
-                                                permissions: { ...prev.permissions, [key]: next }
-                                            }));
+                                        {
+                                            key: 'canApproveAsset',
+                                            label: 'Approve Assets',
+                                            desc: 'Review and approve/reject pending asset submissions',
+                                            icon: CheckCircle2,
+                                            isApproval: true
+                                        },
+                                        {
+                                            key: 'canAddAsset',
+                                            label: 'Add Assets',
+                                            desc: 'Register and create new asset records in inventory',
+                                            icon: Plus
+                                        },
+                                        {
+                                            key: 'canEditAsset',
+                                            label: 'Edit Assets',
+                                            desc: 'Modify specifications, values, and asset details',
+                                            icon: Edit2
+                                        },
+                                        {
+                                            key: 'canTransferAssets',
+                                            label: 'Transfer Assets',
+                                            desc: 'Transfer custody or reassign assets between divisions',
+                                            icon: Package
+                                        },
+                                        {
+                                            key: 'canArchiveAsset',
+                                            label: 'Archive Assets',
+                                            desc: 'Archive assets or mark them for disposal',
+                                            icon: Trash2
+                                        },
+                                        {
+                                            key: 'canRestoreAsset',
+                                            label: 'Restore Assets',
+                                            desc: 'Restore archived or disposed assets back to active',
+                                            icon: RotateCcw
+                                        },
+                                        {
+                                            key: 'canScheduleMaintenance',
+                                            label: 'Schedule Maintenance',
+                                            desc: 'Schedule maintenance and create work requests',
+                                            icon: Clock
+                                        },
+                                        {
+                                            key: 'canAssignTasks',
+                                            label: 'Assign Tasks',
+                                            desc: 'Assign maintenance tasks and work orders to staff',
+                                            icon: Users
+                                        },
+                                        {
+                                            key: 'canViewHistory',
+                                            label: 'View History',
+                                            desc: 'Access complete activity logs and audit trails',
+                                            icon: Search
+                                        },
+                                        {
+                                            key: 'canViewDetails',
+                                            label: 'View Details',
+                                            desc: 'View comprehensive asset specs and financial values',
+                                            icon: Shield
+                                        },
+                                    ].map(({ key, label, desc, icon: Icon, isApproval }) => {
+                                        const currentVal = editFormData.permissions ? editFormData.permissions[key] : undefined;
+                                        const isGranted = currentVal === true;
+                                        const isDenied = currentVal === false;
+                                        const isDefault = currentVal === null || currentVal === undefined;
+
+                                        const setPerm = (nextVal) => {
+                                            setEditFormData(prev => {
+                                                const nextPerms = { ...(prev.permissions || {}) };
+                                                if (nextVal === null || nextVal === undefined) {
+                                                    delete nextPerms[key];
+                                                } else {
+                                                    nextPerms[key] = nextVal;
+                                                }
+                                                return { ...prev, permissions: nextPerms };
+                                            });
                                         };
+
                                         return (
                                             <div
                                                 key={key}
-                                                onClick={cycle}
-                                                role="button"
-                                                tabIndex={0}
-                                                onKeyDown={(e) => e.key === 'Enter' && cycle()}
-                                                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all select-none ${
-                                                    isGranted ? 'bg-success/10 border-success/40 hover:bg-success/15' :
-                                                    isDenied  ? 'bg-danger/10  border-danger/40  hover:bg-danger/15'  :
-                                                    'bg-bg-hover/50 border-border-color hover:border-primary/40 hover:bg-primary/5'
+                                                className={`p-3 rounded-xl border transition-all ${
+                                                    isApproval
+                                                        ? isGranted
+                                                            ? 'bg-success/10 border-success/50 ring-1 ring-success/30'
+                                                            : isDenied
+                                                                ? 'bg-danger/10 border-danger/40 ring-1 ring-danger/20'
+                                                                : 'bg-primary/5 border-primary/30 ring-1 ring-primary/20'
+                                                        : isGranted
+                                                            ? 'bg-success/10 border-success/40'
+                                                            : isDenied
+                                                                ? 'bg-danger/10 border-danger/40'
+                                                                : 'bg-bg-hover/40 border-border-color'
                                                 }`}
                                             >
-                                                <div>
-                                                    <p className="text-xs font-bold text-text-primary">{label}</p>
-                                                    <p className="text-[10px] text-text-muted font-medium">{desc}</p>
+                                                <div className="flex items-start justify-between gap-2 mb-2.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`p-1.5 rounded-lg ${
+                                                            isGranted
+                                                                ? 'bg-success/20 text-success'
+                                                                : isDenied
+                                                                    ? 'bg-danger/20 text-danger'
+                                                                    : isApproval
+                                                                        ? 'bg-primary/20 text-primary'
+                                                                        : 'bg-bg-card text-text-muted'
+                                                        }`}>
+                                                            <Icon size={14} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <p className="text-xs font-bold text-text-primary leading-tight">{label}</p>
+                                                                {isApproval && (
+                                                                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 bg-primary/20 text-primary rounded">
+                                                                        Approve Access
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[10px] text-text-muted font-medium line-clamp-1">{desc}</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
-                                                    isGranted ? 'bg-success/20 text-success' :
-                                                    isDenied  ? 'bg-danger/20  text-danger'  :
-                                                    'bg-text-muted/15 text-text-muted'
-                                                }`}>
-                                                    {isGranted ? <><Check size={10} strokeWidth={3} /> Allow</> :
-                                                     isDenied  ? <><X     size={10} strokeWidth={3} /> Deny</>  :
-                                                     '— Default'}
+
+                                                {/* Explicit Segmented Permission Buttons */}
+                                                <div className="flex items-center gap-1 p-1 bg-bg-card/80 border border-border-color/80 rounded-lg">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPerm(null)}
+                                                        className={`flex-1 py-1 rounded-md text-[10px] font-bold transition-all text-center ${
+                                                            isDefault
+                                                                ? 'bg-text-secondary/20 text-text-primary shadow-xs'
+                                                                : 'text-text-muted hover:text-text-primary hover:bg-bg-hover/50'
+                                                        }`}
+                                                        title="Follow role default"
+                                                    >
+                                                        Default
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPerm(true)}
+                                                        className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[10px] font-bold transition-all ${
+                                                            isGranted
+                                                                ? 'bg-success text-white shadow-sm shadow-success/30'
+                                                                : 'text-success/80 hover:bg-success/15 hover:text-success'
+                                                        }`}
+                                                        title="Explicitly grant this permission"
+                                                    >
+                                                        <Check size={11} strokeWidth={3} /> Allow
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPerm(false)}
+                                                        className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[10px] font-bold transition-all ${
+                                                            isDenied
+                                                                ? 'bg-danger text-white shadow-sm shadow-danger/30'
+                                                                : 'text-danger/80 hover:bg-danger/15 hover:text-danger'
+                                                        }`}
+                                                        title="Explicitly deny this permission"
+                                                    >
+                                                        <X size={11} strokeWidth={3} /> Deny
+                                                    </button>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                <p className="text-[10px] text-text-muted/70 italic text-center">
-                                    <strong>Default</strong> follows the user's role · <strong>Allow</strong> grants regardless of role · <strong>Deny</strong> revokes regardless of role
+                                <p className="text-[10px] text-text-muted/70 italic text-center pt-1">
+                                    <strong>Default:</strong> inherits role permissions · <strong>Allow:</strong> grants access · <strong>Deny:</strong> revokes access
                                 </p>
                             </div>
 

@@ -404,23 +404,47 @@ export const AuthProvider = ({ children }) => {
             if (override === true) return true;
             return ['CEO', 'Chief Executive', 'Director'].includes(u?.role) && u?.role !== 'Auditor';
         },
-        canCheckOutAssets: (u) => u?.role === 'Super Admin' || (['CEO', 'Chief Executive', 'Director'].includes(u?.role) && u?.role !== 'Auditor'),
+        canCheckOutAssets: (u) => {
+            if (u?.role === 'Super Admin') return true;
+            const override = getCustomPerm(u, 'canCheckOutAssets');
+            if (override === false) return false;
+            if (override === true) return true;
+            return (['CEO', 'Chief Executive', 'Director'].includes(u?.role) && u?.role !== 'Auditor');
+        },
         canApproveAsset: (u, asset) => {
             if (u?.role === 'Super Admin') return true;
-            if (u?.role === 'Auditor') return false;
             const override = getCustomPerm(u, 'canApproveAsset');
             if (override === false) return false;
             if (override === true) return true;
+            if (u?.role === 'Auditor') return false;
             if (['CEO'].includes(u?.role)) return true;
             if (u?.role === 'Chief Executive') {
-                return u.division === asset?.division;
+                return !asset?.division || u.division === asset?.division;
             }
             return false;
         },
-        canManageProjects: (u) => u?.role === 'Super Admin' || (['CEO', 'Chief Executive', 'Director'].includes(u?.role) && u?.role !== 'Auditor'),
-        canScheduleMaintenance: (u) => u?.role === 'Super Admin' || (['CEO', 'Chief Executive', 'Director'].includes(u?.role) && u?.role !== 'Auditor'),
+        canManageProjects: (u) => {
+            if (u?.role === 'Super Admin') return true;
+            const override = getCustomPerm(u, 'canManageProjects');
+            if (override === false) return false;
+            if (override === true) return true;
+            return (['CEO', 'Chief Executive', 'Director'].includes(u?.role) && u?.role !== 'Auditor');
+        },
+        canScheduleMaintenance: (u) => {
+            if (u?.role === 'Super Admin') return true;
+            const override = getCustomPerm(u, 'canScheduleMaintenance');
+            if (override === false) return false;
+            if (override === true) return true;
+            return (['CEO', 'Chief Executive', 'Director'].includes(u?.role) && u?.role !== 'Auditor');
+        },
         canManageUsers: (u) => u?.role === 'Super Admin',
-        canAssignTasks: (u) => u?.role === 'Super Admin' || (['CEO'].includes(u?.role) && u?.role !== 'Auditor')
+        canAssignTasks: (u) => {
+            if (u?.role === 'Super Admin') return true;
+            const override = getCustomPerm(u, 'canAssignTasks');
+            if (override === false) return false;
+            if (override === true) return true;
+            return (['CEO'].includes(u?.role) && u?.role !== 'Auditor');
+        }
     };
 
     const logout = async () => {
