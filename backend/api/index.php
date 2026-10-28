@@ -160,7 +160,7 @@ try {
             break;
 
         case '':
-            Response::success(['status' => 'ok'], 'Render API root health check passed (Connected to Supabase)');
+            Response::success(['status' => 'ok'], 'API root health check passed (Connected to Supabase)');
             break;
 
 

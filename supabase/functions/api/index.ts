@@ -250,7 +250,8 @@ app.get("/auth/me", async (c) => {
 
     if (!dbUser) return error(c, "User not found", 404);
 
-    return success(c, { user: dbUser });
+    // Return the user object flat (same shape as login response) to match what AuthContext expects
+    return success(c, dbUser);
 });
 
 // POST /auth/logout
@@ -813,5 +814,34 @@ app.all("*", async (c) => {
     return error(c, `Endpoint not found: ${c.req.method} ${c.req.path}`, 404);
 });
 
-// Export default for Supabase Edge Runtime
-Deno.serve(app.fetch);
+// Export default for Supabase Edge Runtime with path normalization
+Deno.serve(async (req: Request) => {
+    const url = new URL(req.url);
+    const originalPath = url.pathname;
+    let normalizedPath = originalPath;
+
+    // Strip Supabase Edge Function prefixes if present (/functions/v1/api or /api)
+    if (normalizedPath.startsWith("/functions/v1/api")) {
+        normalizedPath = normalizedPath.slice("/functions/v1/api".length);
+    } else if (normalizedPath.startsWith("/functions/v1")) {
+        normalizedPath = normalizedPath.slice("/functions/v1".length);
+    } else if (normalizedPath.startsWith("/api")) {
+        normalizedPath = normalizedPath.slice("/api".length);
+    }
+
+    if (!normalizedPath || normalizedPath === "") {
+        normalizedPath = "/";
+    }
+
+    if (normalizedPath !== originalPath) {
+        url.pathname = normalizedPath;
+        const rewrittenReq = new Request(url.toString(), {
+            method: req.method,
+            headers: req.headers,
+            body: (req.method === "GET" || req.method === "HEAD") ? undefined : req.body,
+        });
+        return app.fetch(rewrittenReq);
+    }
+
+    return app.fetch(req);
+});

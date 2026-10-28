@@ -1,11 +1,11 @@
 /**
- * API Service - Handles all API calls to the PHP backend
- * Production: Backend on Render, DB on Supabase PostgreSQL, Frontend on Netlify
- * Development: Local XAMPP (PHP + PostgreSQL)
+ * API Service - Handles all API calls to the backend
+ * Production: Backend hosted on Supabase Edge Functions + PostgreSQL, Frontend on Netlify
+ * Development: Local Supabase Edge Function / Node.js / XAMPP
  */
 
 // In production, VITE_API_URL must be set in Netlify environment variables
-// pointing to your Render backend, e.g. https://your-app.onrender.com/api/index.php
+// pointing to your Supabase Edge Function, e.g. https://[YOUR-PROJECT-REF].supabase.co/functions/v1/api
 const CONFIGURED_BASE = import.meta.env.VITE_API_URL
     || (import.meta.env.DEV ? '/api/index.php' : '');
 
@@ -15,6 +15,7 @@ const BASE_URL_CANDIDATES = import.meta.env.DEV
         'http://localhost:5000',
         'http://localhost:5000/api',
         'http://127.0.0.1:5000',
+        'http://127.0.0.1:54321/functions/v1/api',
         '/api/index.php',
         'http://localhost/gha-asset-manager/backend/api/index.php',
         'http://localhost/backend/api/index.php',
@@ -146,7 +147,7 @@ class APIClient {
         const [basePath, queryPart] = endpoint.split('?');
 
         let url;
-        if (baseUrl.includes('supabase.co/functions') || baseUrl.includes('localhost:5000')) {
+        if (baseUrl.includes('supabase.co') || baseUrl.includes(':54321') || baseUrl.includes('localhost:5000')) {
             const cleanBase = baseUrl.replace(/\/$/, '');
             const cleanEndpoint = endpoint.replace(/^\//, '');
             url = `${cleanBase}/${cleanEndpoint}`;

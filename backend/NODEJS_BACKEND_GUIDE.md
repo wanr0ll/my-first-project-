@@ -73,8 +73,7 @@ backend/
 │   └── notificationRoutes.js     # /api/notifications/*
 ├── uploads/
 │   └── receipts/         # Uploaded receipts & scanned documents
-├── server.js             # Express application entry point
-├── Dockerfile            # Production container configuration for Render
+├── server.js             # Express application entry point (Local development)
 └── package.json          # Node.js dependencies & scripts
 ```
 

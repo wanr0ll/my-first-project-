@@ -60,13 +60,15 @@ export const AuthProvider = ({ children }) => {
             try {
                 const response = await API.getCurrentUser();
                 if (response.success && response.data) {
-                    setUser(response.data);
+                    // Normalize: Supabase edge function wraps in { user: ... }, Node backend returns flat
+                    const resolvedUser = response.data.user ?? response.data;
+                    setUser(resolvedUser);
                     setIsAuthenticated(true);
                     
                     // Update last active status silently
                     API.pingUser().catch(e => console.error('Ping failed:', e));
                     
-                    if (response.data.role === 'Super Admin') {
+                    if (resolvedUser.role === 'Super Admin') {
                         loadUsers();
                     }
                 } else {

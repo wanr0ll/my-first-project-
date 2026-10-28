@@ -1,5 +1,5 @@
 # Supabase CLI Configuration
-project_id = "gha_asset_manager"
+project_id = "vuvhflqxlizmgllkssjr"
 
 [api]
 enabled = true
