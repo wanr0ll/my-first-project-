@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, User, Bell, Shield, Globe, Users, Check, X, Trash2 } from 'lucide-react';
+import { Save, User, Bell, Shield, Globe, Users, Check, X, Trash2, CheckCircle2, PlusCircle, Edit3, ArrowRightLeft, Archive, RotateCcw, CalendarClock, History, Eye, Search, CheckCheck } from 'lucide-react';
 import { useToast } from '../components/Toast';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +30,7 @@ const Settings = () => {
     });
 
     // Security States
+    const [permissionsSearch, setPermissionsSearch] = useState('');
     const [is2FAEnabled, setIs2FAEnabled] = useState(true);
     const [notificationsState, setNotificationsState] = useState({
         critical: true,
@@ -410,68 +411,306 @@ const Settings = () => {
 
                             {activeTab === 'permissions' && (
                                 <div className="space-y-6">
-                                    <div className="flex justify-between items-center border-b border-border-color pb-4 mb-6">
-                                        <h2 className="text-xl font-bold text-text-primary">Staff & User Permissions</h2>
-                                        <div className="text-xs font-bold text-primary px-3 py-1 bg-primary/10 rounded-lg uppercase tracking-widest border border-primary/20">Super Admin Config</div>
+                                    {/* Header */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-color pb-4">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h2 className="text-xl font-bold text-text-primary">Staff & Operational Permissions</h2>
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
+                                                    Super Admin
+                                                </span>
+                                            </div>
+                                            <p className="text-text-muted text-xs font-medium mt-1">Configure operational authority and custom privilege overrides per user account.</p>
+                                        </div>
+                                        {/* Search Filter */}
+                                        <div className="relative w-full sm:w-72">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={15} />
+                                            <input
+                                                type="text"
+                                                placeholder="Filter staff by name or role..."
+                                                value={permissionsSearch}
+                                                onChange={(e) => setPermissionsSearch(e.target.value)}
+                                                className="w-full bg-bg-card border border-border-color rounded-xl py-2 pl-9 pr-8 text-xs font-medium focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all"
+                                            />
+                                            {permissionsSearch && (
+                                                <button
+                                                    onClick={() => setPermissionsSearch('')}
+                                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-xs"
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        <p className="text-text-muted text-sm font-medium">Configure operational permissions and action overrides for users in the system.</p>
+                                    {/* Staff Cards Grid */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-2">
+                                        {users && users
+                                            .filter(u => u.role !== 'Super Admin' && u.id !== user?.id)
+                                            .filter(u => {
+                                                if (!permissionsSearch.trim()) return true;
+                                                const q = permissionsSearch.toLowerCase();
+                                                return (u.name || '').toLowerCase().includes(q) ||
+                                                    (u.email || '').toLowerCase().includes(q) ||
+                                                    (u.role || '').toLowerCase().includes(q) ||
+                                                    (u.position || '').toLowerCase().includes(q);
+                                            })
+                                            .map((targetUser) => {
+                                                const userPerms = targetUser.permissions
+                                                    ? (typeof targetUser.permissions === 'string' ? JSON.parse(targetUser.permissions) : targetUser.permissions)
+                                                    : {};
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                                            {users && users.filter(u => u.role !== 'Super Admin' && u.id !== user?.id).map((targetUser) => {
-                                                const userPerms = targetUser.permissions ? (typeof targetUser.permissions === 'string' ? JSON.parse(targetUser.permissions) : targetUser.permissions) : {};
+                                                const PERMISSION_CONFIGS = [
+                                                    {
+                                                        key: 'canApproveAsset',
+                                                        label: 'Approve Assets',
+                                                        desc: 'Authorize & approve pending asset additions & modifications',
+                                                        icon: CheckCircle2,
+                                                        isApproval: true,
+                                                        badge: 'Approval Authority'
+                                                    },
+                                                    {
+                                                        key: 'canAddAsset',
+                                                        label: 'Add New Asset',
+                                                        desc: 'Register and submit new assets to inventory',
+                                                        icon: PlusCircle
+                                                    },
+                                                    {
+                                                        key: 'canEditAsset',
+                                                        label: 'Edit Assets',
+                                                        desc: 'Modify asset specifications, values and conditions',
+                                                        icon: Edit3
+                                                    },
+                                                    {
+                                                        key: 'canTransferAssets',
+                                                        label: 'Transfer Assets',
+                                                        desc: 'Reassign custody and transfer assets across divisions',
+                                                        icon: ArrowRightLeft
+                                                    },
+                                                    {
+                                                        key: 'canArchiveAsset',
+                                                        label: 'Archive Assets',
+                                                        desc: 'Archive aging assets or designate for disposal review',
+                                                        icon: Archive
+                                                    },
+                                                    {
+                                                        key: 'canRestoreAsset',
+                                                        label: 'Restore Assets',
+                                                        desc: 'Reactivate previously archived or disposed assets',
+                                                        icon: RotateCcw
+                                                    },
+                                                    {
+                                                        key: 'canScheduleMaintenance',
+                                                        label: 'Schedule Maintenance',
+                                                        desc: 'Schedule maintenance, inspections & work requests',
+                                                        icon: CalendarClock
+                                                    },
+                                                    {
+                                                        key: 'canViewHistory',
+                                                        label: 'View History',
+                                                        desc: 'Inspect asset audit trail & change activity logs',
+                                                        icon: History
+                                                    },
+                                                    {
+                                                        key: 'canViewDetails',
+                                                        label: 'View Details',
+                                                        desc: 'Access full asset valuation records and specifications',
+                                                        icon: Eye
+                                                    }
+                                                ];
+
+                                                const activeCount = PERMISSION_CONFIGS.filter(p => userPerms[p.key] === true).length;
+
+                                                const togglePerm = async (permKey) => {
+                                                    const nextState = userPerms[permKey] === true ? false : true;
+                                                    const updated = { ...userPerms, [permKey]: nextState };
+                                                    const res = await updateUser(targetUser.id, { permissions: JSON.stringify(updated) });
+                                                    if (res?.success) {
+                                                        addToast(`Updated ${targetUser.name}'s permissions`, 'success');
+                                                    }
+                                                };
+
+                                                const setAll = async (value) => {
+                                                    const updated = {};
+                                                    PERMISSION_CONFIGS.forEach(p => { updated[p.key] = value; });
+                                                    const res = await updateUser(targetUser.id, { permissions: JSON.stringify(updated) });
+                                                    if (res?.success) {
+                                                        addToast(`${value ? 'Granted' : 'Revoked'} all permissions for ${targetUser.name}`, 'info');
+                                                    }
+                                                };
+
                                                 return (
-                                                    <div key={targetUser.id} className="p-4 rounded-xl border border-border-color bg-bg-hover/30">
-                                                        <div className="flex justify-between items-center mb-4 border-b border-border-color pb-3">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shadow-sm">{getInitials(targetUser.name)}</div>
-                                                                <div>
-                                                                    <div className="text-sm font-bold text-text-primary">{targetUser.name}</div>
-                                                                    <div className="text-[10px] uppercase font-bold text-text-muted">{targetUser.email}</div>
-                                                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase tracking-wider">{targetUser.role || 'User'}</span>
-                                                                        {targetUser.position && (
-                                                                            <span className="text-[9px] font-medium text-text-muted truncate max-w-[140px]">{targetUser.position}</span>
-                                                                        )}
+                                                    <div
+                                                        key={targetUser.id}
+                                                        className="glass-panel rounded-2xl border border-border-color bg-bg-card shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col justify-between"
+                                                    >
+                                                        {/* Top Accent Gradient Bar */}
+                                                        <div className="h-1 bg-gradient-to-r from-primary via-primary-light to-emerald-500 w-full" />
+
+                                                        <div className="p-5">
+                                                            {/* User Header */}
+                                                            <div className="flex items-start justify-between gap-3 pb-4 mb-3 border-b border-border-color/80">
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <div className="relative flex-shrink-0">
+                                                                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center text-primary font-bold text-sm shadow-sm overflow-hidden">
+                                                                            {targetUser.profile_image ? (
+                                                                                <img
+                                                                                    src={getFullImageUrl(targetUser.profile_image)}
+                                                                                    alt={targetUser.name}
+                                                                                    className="w-full h-full object-cover"
+                                                                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                                                                />
+                                                                            ) : (
+                                                                                getInitials(targetUser.name)
+                                                                            )}
+                                                                        </div>
+                                                                        <span
+                                                                            className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-bg-card ${
+                                                                                targetUser.status === 'active' ? 'bg-success' : 'bg-warning'
+                                                                            }`}
+                                                                            title={targetUser.status === 'active' ? 'Active Account' : 'Pending Account'}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="min-w-0">
+                                                                        <h3 className="text-sm font-bold text-text-primary truncate">{targetUser.name}</h3>
+                                                                        <p className="text-[11px] text-text-muted truncate font-medium">{targetUser.email}</p>
+                                                                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider border border-primary/20">
+                                                                                {targetUser.role || 'Staff'}
+                                                                            </span>
+                                                                            {targetUser.position && (
+                                                                                <span className="text-[9px] font-medium text-text-secondary truncate max-w-[150px] px-1.5 py-0.5 rounded bg-bg-hover">
+                                                                                    {targetUser.position}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Batch Controls */}
+                                                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                                        {activeCount} of {PERMISSION_CONFIGS.length} Active
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1 mt-1">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setAll(true)}
+                                                                            className="text-[10px] font-bold text-primary hover:text-primary-light transition-colors px-1"
+                                                                            title="Enable all permissions"
+                                                                        >
+                                                                            All On
+                                                                        </button>
+                                                                        <span className="text-text-muted text-[10px]">·</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setAll(false)}
+                                                                            className="text-[10px] font-bold text-text-muted hover:text-danger transition-colors px-1"
+                                                                            title="Disable all permissions"
+                                                                        >
+                                                                            All Off
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                        <div className="space-y-4 pt-1">
-                                                            {[
-                                                                { key: 'canAddAsset', label: 'Add New Asset' },
-                                                                { key: 'canEditAsset', label: 'Edit Assets' },
-                                                                { key: 'canArchiveAsset', label: 'Archive Assets' },
-                                                                { key: 'canRestoreAsset', label: 'Restore Assets' },
-                                                                { key: 'canTransferAssets', label: 'Transfer Assets' },
-                                                                { key: 'canViewHistory', label: 'View History' },
-                                                                { key: 'canViewDetails', label: 'View Details' }
-                                                            ].map(perm => (
-                                                                <div key={perm.key} className="flex justify-between items-center group">
-                                                                    <span className="text-[11px] font-bold text-text-secondary uppercase tracking-widest">{perm.label}</span>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const newPerms = { ...userPerms, [perm.key]: userPerms[perm.key] === true ? false : true };
-                                                                            updateUser(targetUser.id, { permissions: JSON.stringify(newPerms) });
-                                                                            addToast(`Permission updated for ${targetUser.name}`, 'success');
-                                                                        }}
-                                                                        className={`w-10 h-5 rounded-full relative transition-all duration-300 ${userPerms[perm.key] === true ? 'bg-primary' : 'bg-text-muted/20'}`}
-                                                                    >
-                                                                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-300 ${userPerms[perm.key] === true ? 'right-0.5' : 'left-0.5'}`}></div>
-                                                                    </button>
-                                                                </div>
-                                                            ))}
+
+                                                            {/* Permissions Toggle List */}
+                                                            <div className="space-y-1.5 pt-1">
+                                                                {PERMISSION_CONFIGS.map(perm => {
+                                                                    const Icon = perm.icon;
+                                                                    const isAllowed = userPerms[perm.key] === true;
+
+                                                                    return (
+                                                                        <div
+                                                                            key={perm.key}
+                                                                            onClick={() => togglePerm(perm.key)}
+                                                                            className={`group flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer select-none ${
+                                                                                perm.isApproval
+                                                                                    ? isAllowed
+                                                                                        ? 'bg-emerald-500/10 border border-emerald-500/30'
+                                                                                        : 'bg-bg-hover/40 border border-border-color hover:border-emerald-500/30'
+                                                                                    : isAllowed
+                                                                                        ? 'bg-primary/5 border border-primary/20'
+                                                                                        : 'bg-transparent hover:bg-bg-hover/50 border border-transparent'
+                                                                            }`}
+                                                                        >
+                                                                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                                                                                    perm.isApproval
+                                                                                        ? isAllowed
+                                                                                            ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                                                                                            : 'bg-emerald-500/10 text-emerald-500'
+                                                                                        : isAllowed
+                                                                                            ? 'bg-primary/20 text-primary'
+                                                                                            : 'bg-bg-hover text-text-muted group-hover:text-text-secondary'
+                                                                                }`}>
+                                                                                    <Icon size={15} strokeWidth={2.5} />
+                                                                                </div>
+                                                                                <div className="min-w-0">
+                                                                                    <div className="flex items-center gap-1.5">
+                                                                                        <span className="text-xs font-bold text-text-primary leading-tight">
+                                                                                            {perm.label}
+                                                                                        </span>
+                                                                                        {perm.isApproval && (
+                                                                                            <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 tracking-wider">
+                                                                                                Approve
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <p className="text-[10px] text-text-muted font-medium truncate mt-0.5">
+                                                                                        {perm.desc}
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* Modern Switch Toggle */}
+                                                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                                                <span className={`text-[10px] font-bold uppercase tracking-wider hidden sm:inline ${
+                                                                                    isAllowed ? 'text-emerald-600 dark:text-emerald-400' : 'text-text-muted/60'
+                                                                                }`}>
+                                                                                    {isAllowed ? 'Allowed' : 'Off'}
+                                                                                </span>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    role="switch"
+                                                                                    aria-checked={isAllowed}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        togglePerm(perm.key);
+                                                                                    }}
+                                                                                    className={`w-11 h-6 rounded-full relative transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                                                                                        isAllowed
+                                                                                            ? perm.isApproval
+                                                                                                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 shadow-sm shadow-emerald-500/40'
+                                                                                                : 'bg-gradient-to-r from-primary to-primary-light shadow-sm shadow-primary/30'
+                                                                                            : 'bg-slate-300 dark:bg-zinc-700'
+                                                                                    }`}
+                                                                                >
+                                                                                    <div
+                                                                                        className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-300 flex items-center justify-center ${
+                                                                                            isAllowed ? 'translate-x-6' : 'translate-x-1'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {isAllowed && (
+                                                                                            <Check size={9} strokeWidth={3} className={perm.isApproval ? 'text-emerald-600' : 'text-primary'} />
+                                                                                        )}
+                                                                                    </div>
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );
                                             })}
-                                            {users && users.filter(u => u.role !== 'Super Admin' && u.id !== user?.id).length === 0 && (
-                                                <div className="col-span-1 md:col-span-2 text-center py-10 text-text-muted italic border border-dashed border-border-color rounded-xl bg-bg-hover/10">
-                                                    No other users found in the system.
-                                                </div>
-                                            )}
-                                        </div>
+
+                                        {users && users.filter(u => u.role !== 'Super Admin' && u.id !== user?.id).length === 0 && (
+                                            <div className="col-span-1 md:col-span-2 text-center py-12 text-text-muted italic border border-dashed border-border-color rounded-2xl bg-bg-hover/10">
+                                                No other staff users registered in the system.
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
