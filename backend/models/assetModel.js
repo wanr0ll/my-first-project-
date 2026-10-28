@@ -74,6 +74,30 @@ const FIELD_MAPPING = {
     createdBy: 'created_by',
     createdAt: 'created_at',
     updatedAt: 'updated_at',
+    gpsCoordinates: 'gps_coordinates',
+    yearBuilt: 'year_built',
+    numRooms: 'num_rooms',
+    starRating: 'star_rating',
+    numUnits: 'num_units',
+    accommodationType: 'accommodation_type',
+    seatingCapacity: 'seating_capacity',
+    roadLength: 'road_length',
+    roadWidth: 'road_width',
+    surfaceType: 'surface_type',
+    bridgeLength: 'bridge_length',
+    bridgeWidth: 'bridge_width',
+    loadCapacity: 'load_capacity',
+    bridgeType: 'bridge_type',
+    numLanes: 'num_lanes',
+    interchangeType: 'interchange_type',
+    yearOfCommencement: 'year_of_commencement',
+    contractor: 'contractor',
+    supervisors: 'supervisors',
+    commissionedBy: 'commissioned_by',
+    lastMaintenanceType: 'last_maintenance_type',
+    lastMaintenanceDate: 'last_maintenance_date',
+    estimatedResidualLife: 'estimated_residual_life',
+    layerThickness: 'layer_thickness',
 };
 
 const ALLOWED_DB_COLUMNS = [
@@ -92,7 +116,13 @@ const ALLOWED_DB_COLUMNS = [
     'currency', 'balance_amount', 'year_of_manufacture', 'fuel_type',
     'transmission', 'engine_size', 'mileage', 'ip_address', 'port_count',
     'printer_type', 'scanner_type', 'license_type', 'software_version',
-    'license_key', 'vendor', 'created_by'
+    'license_key', 'vendor', 'created_by',
+    'gps_coordinates', 'year_built', 'num_rooms', 'star_rating', 'num_units',
+    'accommodation_type', 'seating_capacity', 'road_length', 'road_width',
+    'surface_type', 'bridge_length', 'bridge_width', 'load_capacity',
+    'bridge_type', 'num_lanes', 'interchange_type', 'year_of_commencement',
+    'contractor', 'supervisors', 'commissioned_by', 'last_maintenance_type',
+    'last_maintenance_date', 'estimated_residual_life', 'layer_thickness'
 ];
 
 class AssetModel {

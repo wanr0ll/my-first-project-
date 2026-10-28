@@ -493,6 +493,170 @@ const handleGetAssets = async (c: any) => {
 app.get("/assets", handleGetAssets);
 app.get("/assets/:category", handleGetAssets);
 
+// Field mapping and schema whitelist for asset operations
+const ASSET_FIELD_MAPPING: Record<string, string> = {
+    majorCategory: "major_category",
+    assetType: "asset_type",
+    category: "category",
+    subType: "sub_type",
+    approvalStatus: "approval_status",
+    ownerDivision: "owner_division",
+    custodianName: "custodian_name",
+    custodianID: "custodian_id",
+    cost: "purchase_cost",
+    purchaseDate: "purchase_date",
+    lastService: "last_service_date",
+    lastInspection: "last_inspection_date",
+    serial: "serial_number",
+    plate: "plate_number",
+    chassis: "chassis_number",
+    engine: "engine_number",
+    usefulLife: "useful_life",
+    residualValue: "residual_value",
+    details: "notes",
+    sizes: "sizes",
+    color: "color",
+    roomNo: "room_number",
+    deskNo: "desk_number",
+    roomName: "room_name",
+    staffAssignedTo: "staff_assigned_to",
+    staffID: "staff_id",
+    type: "type",
+    custodianAddress: "custodian_address",
+    custodianMobile: "custodian_mobile",
+    brandName: "brand_name",
+    model: "model",
+    assetTag: "asset_tag",
+    hasAssetTag: "has_asset_tag",
+    memorySize: "memory_size",
+    processor: "processor",
+    generation: "generation",
+    storageSize: "storage_size",
+    routeName: "route_name",
+    quantity: "quantity",
+    capacity: "capacity",
+    expiryDate: "expiry_date",
+    warrantyExpiry: "warranty_expiry",
+    receiptUrl: "receipt_url",
+    chairMaterial: "chair_material",
+    workstationMaterial: "workstation_material",
+    partitionMaterial: "partition_material",
+    batteryType: "battery_type",
+    runtime: "runtime",
+    numberOfFloors: "number_of_floors",
+    numberOfSeats: "number_of_seats",
+    bankName: "bank_name",
+    accountNumber: "account_number",
+    accountType: "account_type",
+    branch: "branch",
+    currency: "currency",
+    balanceAmount: "balance_amount",
+    yearOfManufacture: "year_of_manufacture",
+    fuelType: "fuel_type",
+    transmission: "transmission",
+    engineSize: "engine_size",
+    mileage: "mileage",
+    ipAddress: "ip_address",
+    portCount: "port_count",
+    printerType: "printer_type",
+    scannerType: "scanner_type",
+    licenseType: "license_type",
+    softwareVersion: "software_version",
+    licenseKey: "license_key",
+    vendor: "vendor",
+    createdBy: "created_by",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
+    // Land & Buildings and Infrastructure fields
+    gpsCoordinates: "gps_coordinates",
+    yearBuilt: "year_built",
+    numRooms: "num_rooms",
+    starRating: "star_rating",
+    numUnits: "num_units",
+    accommodationType: "accommodation_type",
+    seatingCapacity: "seating_capacity",
+    roadLength: "road_length",
+    roadWidth: "road_width",
+    surfaceType: "surface_type",
+    bridgeLength: "bridge_length",
+    bridgeWidth: "bridge_width",
+    loadCapacity: "load_capacity",
+    bridgeType: "bridge_type",
+    numLanes: "num_lanes",
+    interchangeType: "interchange_type",
+    yearOfCommencement: "year_of_commencement",
+    contractor: "contractor",
+    supervisors: "supervisors",
+    commissionedBy: "commissioned_by",
+    lastMaintenanceType: "last_maintenance_type",
+    lastMaintenanceDate: "last_maintenance_date",
+    estimatedResidualLife: "estimated_residual_life",
+    layerThickness: "layer_thickness",
+};
+
+const ALLOWED_ASSET_COLUMNS = new Set([
+    "id", "name", "major_category", "asset_type", "category", "sub_type", "status",
+    "division", "owner_division", "custodian_name", "custodian_id", "location",
+    "purchase_date", "purchase_cost", "useful_life", "residual_value",
+    "last_service_date", "last_inspection_date", "approval_status", "notes",
+    "image", "serial_number", "plate_number", "chassis_number", "engine_number",
+    "sizes", "color", "room_number", "desk_number", "room_name", "staff_assigned_to",
+    "staff_id", "type", "custodian_address", "custodian_mobile", "brand_name",
+    "model", "asset_tag", "has_asset_tag", "memory_size", "processor", "generation",
+    "storage_size", "route_name", "quantity", "capacity", "expiry_date",
+    "warranty_expiry", "receipt_url", "chair_material", "workstation_material",
+    "partition_material", "battery_type", "runtime", "number_of_floors",
+    "number_of_seats", "bank_name", "account_number", "account_type", "branch",
+    "currency", "balance_amount", "year_of_manufacture", "fuel_type",
+    "transmission", "engine_size", "mileage", "ip_address", "port_count",
+    "printer_type", "scanner_type", "license_type", "software_version",
+    "license_key", "vendor", "created_at", "updated_at", "created_by",
+    "gps_coordinates", "year_built", "num_rooms", "star_rating", "num_units",
+    "accommodation_type", "seating_capacity", "road_length", "road_width",
+    "surface_type", "bridge_length", "bridge_width", "load_capacity",
+    "bridge_type", "num_lanes", "interchange_type", "year_of_commencement",
+    "contractor", "supervisors", "commissioned_by", "last_maintenance_type",
+    "last_maintenance_date", "estimated_residual_life", "layer_thickness"
+]);
+
+const NUMERIC_COLUMNS = new Set([
+    "purchase_cost", "useful_life", "residual_value", "quantity",
+    "balance_amount", "year_of_manufacture", "year_built", "num_rooms",
+    "num_units", "year_of_commencement"
+]);
+
+const DATE_COLUMNS = new Set([
+    "purchase_date", "last_service_date", "last_inspection_date",
+    "expiry_date", "warranty_expiry", "last_maintenance_date"
+]);
+
+function sanitizeAssetPayload(data: Record<string, any>): Record<string, any> {
+    const cleaned: Record<string, any> = {};
+
+    for (const [rawKey, rawVal] of Object.entries(data)) {
+        const key = ASSET_FIELD_MAPPING[rawKey] || rawKey;
+        if (!ALLOWED_ASSET_COLUMNS.has(key)) {
+            continue; // Skip fields not present in schema
+        }
+
+        let val = rawVal;
+        if (val === "" || val === undefined) {
+            val = null;
+        } else if (NUMERIC_COLUMNS.has(key)) {
+            const num = Number(val);
+            val = isNaN(num) ? null : num;
+        } else if (DATE_COLUMNS.has(key) && val) {
+            if (typeof val === "string" && (val.startsWith("0000") || val.trim() === "")) {
+                val = null;
+            }
+        }
+
+        cleaned[key] = val;
+    }
+
+    return cleaned;
+}
+
 // POST /assets
 app.post("/assets", async (c) => {
     const authUser = await authenticate(c);
@@ -504,20 +668,18 @@ app.post("/assets", async (c) => {
     }
 
     const assetId = body.id || generateId("AST");
-    const newAsset = {
+    const rawAsset = {
         ...body,
         id: assetId,
         major_category: body.majorCategory || body.major_category || "Fixed Asset",
         asset_type: body.assetType || body.asset_type || "Moveable",
-        approval_status: "Pending",
+        approval_status: body.approval_status || body.approvalStatus || "Pending",
         created_by: authUser.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     };
 
-    // Clean camelCase duplicate props
-    delete (newAsset as any).majorCategory;
-    delete (newAsset as any).assetType;
+    const newAsset = sanitizeAssetPayload(rawAsset);
 
     const { error: insErr } = await supabase.from("assets").insert(newAsset);
     if (insErr) return error(c, insErr.message, 500);
@@ -546,11 +708,15 @@ app.put("/assets", async (c) => {
     const id = body.id || c.req.query("id");
     if (!id) return error(c, "Asset ID is required", 400);
 
-    const updates = {
+    const updates = sanitizeAssetPayload({
         ...body,
         updated_at: new Date().toISOString(),
-    };
+    });
     delete updates.id;
+
+    if (Object.keys(updates).length === 0) {
+        return error(c, "No valid fields provided for update", 400);
+    }
 
     const { error: updErr } = await supabase.from("assets").update(updates).eq("id", id);
     if (updErr) return error(c, updErr.message, 500);
