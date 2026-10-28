@@ -408,6 +408,9 @@ export const AuthProvider = ({ children }) => {
         canApproveAsset: (u, asset) => {
             if (u?.role === 'Super Admin') return true;
             if (u?.role === 'Auditor') return false;
+            const override = getCustomPerm(u, 'canApproveAsset');
+            if (override === false) return false;
+            if (override === true) return true;
             if (['CEO'].includes(u?.role)) return true;
             if (u?.role === 'Chief Executive') {
                 return u.division === asset?.division;

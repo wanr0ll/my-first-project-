@@ -27,7 +27,7 @@ const UserManagement = () => {
     // Edit State
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [editFormData, setEditFormData] = useState({ name: '', email: '', role: '', position: '', password: '', phone: '' });
+    const [editFormData, setEditFormData] = useState({ name: '', email: '', role: '', position: '', password: '', phone: '', permissions: {} });
 
     // Create User State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -105,20 +105,30 @@ const UserManagement = () => {
 
     const handleEditClick = (user) => {
         setEditingUser(user);
+        let parsedPerms = {};
+        try {
+            parsedPerms = user.permissions
+                ? (typeof user.permissions === 'string' ? JSON.parse(user.permissions) : user.permissions)
+                : {};
+        } catch { parsedPerms = {}; }
         setEditFormData({
             name: user.name,
             email: user.email,
             role: user.role,
             position: user.position || '',
             password: '',
-            phone: user.phone || ''
+            phone: user.phone || '',
+            permissions: parsedPerms || {}
         });
         setIsEditModalOpen(true);
     };
 
     const handleUpdateUser = (e) => {
         e.preventDefault();
-        updateUser(editingUser.id, editFormData);
+        const payload = { ...editFormData };
+        // Serialize permissions as JSON string for backend storage
+        payload.permissions = JSON.stringify(editFormData.permissions || {});
+        updateUser(editingUser.id, payload);
         setIsEditModalOpen(false);
     };
 
@@ -544,6 +554,70 @@ const UserManagement = () => {
                                     <p className="text-[10px] text-text-muted mt-2 ml-1 uppercase tracking-widest font-bold">Leave blank to keep existing password.</p>
                                 </div>
                             </div>
+                            {/* ── Custom Permissions Panel ── */}
+                            <div className="space-y-3 pt-2">
+                                <div className="flex items-center gap-2 pb-1">
+                                    <Shield size={14} className="text-primary" />
+                                    <span className="text-sm font-bold text-text-primary">Custom Permissions</span>
+                                    <span className="ml-auto text-[10px] text-text-muted font-medium">Overrides role defaults · Click to cycle</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {[
+                                        { key: 'canAddAsset',      label: 'Add Assets',      desc: 'Create new asset records' },
+                                        { key: 'canEditAsset',     label: 'Edit Assets',     desc: 'Modify existing asset data' },
+                                        { key: 'canApproveAsset',  label: 'Approve Assets',  desc: 'Approve pending submissions' },
+                                        { key: 'canArchiveAsset',  label: 'Archive Assets',  desc: 'Archive or dispose of assets' },
+                                        { key: 'canRestoreAsset',  label: 'Restore Assets',  desc: 'Restore archived assets' },
+                                        { key: 'canTransferAssets',label: 'Transfer Assets', desc: 'Transfer assets between divisions' },
+                                        { key: 'canViewHistory',   label: 'View History',    desc: 'Access asset activity logs' },
+                                        { key: 'canViewDetails',   label: 'View Details',    desc: 'View full asset detail records' },
+                                    ].map(({ key, label, desc }) => {
+                                        const val = editFormData.permissions[key];
+                                        const isGranted = val === true;
+                                        const isDenied  = val === false;
+                                        const isDefault = val === null || val === undefined;
+                                        const cycle = () => {
+                                            const next = isDefault ? true : isGranted ? false : null;
+                                            setEditFormData(prev => ({
+                                                ...prev,
+                                                permissions: { ...prev.permissions, [key]: next }
+                                            }));
+                                        };
+                                        return (
+                                            <div
+                                                key={key}
+                                                onClick={cycle}
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyDown={(e) => e.key === 'Enter' && cycle()}
+                                                className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all select-none ${
+                                                    isGranted ? 'bg-success/10 border-success/40 hover:bg-success/15' :
+                                                    isDenied  ? 'bg-danger/10  border-danger/40  hover:bg-danger/15'  :
+                                                    'bg-bg-hover/50 border-border-color hover:border-primary/40 hover:bg-primary/5'
+                                                }`}
+                                            >
+                                                <div>
+                                                    <p className="text-xs font-bold text-text-primary">{label}</p>
+                                                    <p className="text-[10px] text-text-muted font-medium">{desc}</p>
+                                                </div>
+                                                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
+                                                    isGranted ? 'bg-success/20 text-success' :
+                                                    isDenied  ? 'bg-danger/20  text-danger'  :
+                                                    'bg-text-muted/15 text-text-muted'
+                                                }`}>
+                                                    {isGranted ? <><Check size={10} strokeWidth={3} /> Allow</> :
+                                                     isDenied  ? <><X     size={10} strokeWidth={3} /> Deny</>  :
+                                                     '— Default'}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-[10px] text-text-muted/70 italic text-center">
+                                    <strong>Default</strong> follows the user's role · <strong>Allow</strong> grants regardless of role · <strong>Deny</strong> revokes regardless of role
+                                </p>
+                            </div>
+
                             <div className="pt-4 flex justify-end gap-3 border-t border-border-color">
                                 <button
                                     type="button"
