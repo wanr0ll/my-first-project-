@@ -298,25 +298,35 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const updateUser = async (userId, updatedData) => {
+    const updateUser = async (userId, updatedData, options = {}) => {
+        const isSilent = options?.silent === true || updatedData?.silent === true;
+        const cleanData = { ...updatedData };
+        delete cleanData.silent;
+
         try {
-            const response = await API.updateUser(userId, updatedData);
+            const response = await API.updateUser(userId, cleanData);
             if (response.success) {
-                addToast('User account updated successfully.', 'success');
+                if (!isSilent) {
+                    addToast('User account updated successfully.', 'success');
+                }
 
                 // If the updated user is the current user, update the local user state
                 if (userId === user?.id) {
-                    setUser(prev => ({ ...prev, ...updatedData }));
+                    setUser(prev => ({ ...prev, ...cleanData }));
                 }
 
                 loadUsers(); // Refresh list for Super Admins
                 return { success: true };
             } else {
-                addToast(response.message || 'Update failed', 'error');
+                if (!isSilent) {
+                    addToast(response.message || 'Update failed', 'error');
+                }
                 return { success: false };
             }
         } catch (error) {
-            addToast(error.message || 'Update failed', 'error');
+            if (!isSilent) {
+                addToast(error.message || 'Update failed', 'error');
+            }
             return { success: false };
         }
     };

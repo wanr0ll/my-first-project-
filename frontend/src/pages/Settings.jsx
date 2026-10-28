@@ -524,19 +524,13 @@ const Settings = () => {
                                                 const togglePerm = async (permKey) => {
                                                     const nextState = userPerms[permKey] === true ? false : true;
                                                     const updated = { ...userPerms, [permKey]: nextState };
-                                                    const res = await updateUser(targetUser.id, { permissions: JSON.stringify(updated) });
-                                                    if (res?.success) {
-                                                        addToast(`Updated ${targetUser.name}'s permissions`, 'success');
-                                                    }
+                                                    await updateUser(targetUser.id, { permissions: JSON.stringify(updated) }, { silent: true });
                                                 };
 
                                                 const setAll = async (value) => {
                                                     const updated = {};
                                                     PERMISSION_CONFIGS.forEach(p => { updated[p.key] = value; });
-                                                    const res = await updateUser(targetUser.id, { permissions: JSON.stringify(updated) });
-                                                    if (res?.success) {
-                                                        addToast(`${value ? 'Granted' : 'Revoked'} all permissions for ${targetUser.name}`, 'info');
-                                                    }
+                                                    await updateUser(targetUser.id, { permissions: JSON.stringify(updated) }, { silent: true });
                                                 };
 
                                                 return (
@@ -647,7 +641,7 @@ const Settings = () => {
                                                                                     <Icon size={15} strokeWidth={2.5} />
                                                                                 </div>
                                                                                 <div className="min-w-0">
-                                                                                    <div className="flex items-center gap-1.5">
+                                                                                    <div className="flex items-center gap-1.5 flex-wrap">
                                                                                         <span className="text-xs font-bold text-text-primary leading-tight">
                                                                                             {perm.label}
                                                                                         </span>
@@ -664,12 +658,7 @@ const Settings = () => {
                                                                             </div>
 
                                                                             {/* Modern Switch Toggle */}
-                                                                            <div className="flex items-center gap-2 flex-shrink-0">
-                                                                                <span className={`text-[10px] font-bold uppercase tracking-wider hidden sm:inline ${
-                                                                                    isAllowed ? 'text-emerald-600 dark:text-emerald-400' : 'text-text-muted/60'
-                                                                                }`}>
-                                                                                    {isAllowed ? 'Allowed' : 'Off'}
-                                                                                </span>
+                                                                            <div className="flex items-center flex-shrink-0">
                                                                                 <button
                                                                                     type="button"
                                                                                     role="switch"
