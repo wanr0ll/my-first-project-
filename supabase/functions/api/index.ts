@@ -13,8 +13,45 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const JWT_SECRET = Deno.env.get("JWT_SECRET") || "gha_asset_manager_secret_key_2026";
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") || "";
-const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") || Deno.env.get("SMTP_FROM") || "noreply@gha.gov.gh";
+const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") || Deno.env.get("SMTP_FROM") || "ghaassetmanagementsystem@gmail.com";
 const BREVO_SENDER_NAME = Deno.env.get("BREVO_SENDER_NAME") || Deno.env.get("SMTP_FROM_NAME") || "Ghana Highway Authority";
+
+function buildVerificationEmailHtml(name: string, otp: string): string {
+    return `
+        <div style='font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+            <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: #1e293b !important; background: #1e293b !important;'>
+                <tr>
+                    <td bgcolor='#1e293b' align='center' style='background-color: #1e293b !important; padding: 26px 12px; border-bottom: 4px solid #f59e0b; text-align: center;'>
+                        <h1 style='color: #ffffff !important; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;'>
+                            Ghana Highway Authority
+                        </h1>
+                        <p style='color: #94a3b8 !important; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;'>
+                            Asset Management System
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            <div style='padding: 40px 30px;'>
+                <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px; font-weight: 700;'>Account Verification</h2>
+                <p style='color: #475569; line-height: 1.6; margin: 0 0 20px; font-size: 15px;'>Hello <strong>${name}</strong>,</p>
+                <p style='color: #475569; line-height: 1.6; margin: 0 0 30px; font-size: 15px;'>Thank you for registering with the Ghana Highway Authority Asset Management System. Please use the verification code below to activate your account:</p>
+                <div style='background-color: #f1f5f9; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 30px; border: 1px dashed #cbd5e1;'>
+                    <span style='font-family: "Courier New", Courier, monospace; font-size: 36px; font-weight: bold; letter-spacing: 12px; color: #2563eb;'>${otp}</span>
+                </div>
+                <p style='color: #64748b; font-size: 14px; margin: 0 0 10px;'>This code will expire in <strong>24 hours</strong>.</p>
+                <p style='color: #64748b; font-size: 14px; margin: 0;'>If you did not create an account, please ignore this email.</p>
+            </div>
+            <div style='background-color: #f8fafc; padding: 25px 30px; border-top: 1px solid #e2e8f0; text-align: center;'>
+                <p style='color: #94a3b8; font-size: 12px; margin: 0 0 10px;'>&copy; ${new Date().getFullYear()} Ghana Highway Authority. All rights reserved.</p>
+                <p style='color: #94a3b8; font-size: 11px; margin: 0; line-height: 1.4;'>
+                    Head Office, P.O. Box GP 1641, Accra - Ghana<br>
+                    Digital Address: GA-107-2101<br>
+                    This is an automated message, please do not reply.
+                </p>
+            </div>
+        </div>
+    `;
+}
 
 async function sendEmailViaBrevo(to: string, subject: string, htmlContent: string): Promise<boolean> {
     if (!BREVO_API_KEY) {
@@ -234,6 +271,8 @@ app.post("/auth/register", async (c) => {
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     const userId = generateId("USR");
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
 
     const newUser = {
         id: userId,
@@ -245,7 +284,9 @@ app.post("/auth/register", async (c) => {
         position,
         phone,
         status: "active",
-        email_verified: true, // Auto-verified for seamless onboard
+        email_verified: false,
+        verification_token: otp,
+        verification_token_expiry: expiry,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     };
@@ -255,8 +296,160 @@ app.post("/auth/register", async (c) => {
         return error(c, `Registration failed: ${insertErr.message}`, 500);
     }
 
-    const token = jwt.sign(
-        { id: userId, email: newUser.email, role: newUser.role, name: newUser.name },
+    // Send verification email via Brevo
+    await sendEmailViaBrevo(
+        newUser.email,
+        "Verify Your Account - Ghana Highway Authority",
+        buildVerificationEmailHtml(newUser.name, otp)
+    );
+
+    return success(
+        c,
+        { id: userId },
+        "Registration successful. Please check your email for the verification code.",
+        201
+    );
+});
+
+// POST /auth/resend-verification
+app.post("/auth/resend-verification", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const { email } = body;
+
+    if (!email) {
+        return error(c, "Email is required", 400);
+    }
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, name, email, email_verified")
+        .ilike("email", email.trim())
+        .maybeSingle();
+
+    if (!user) {
+        return success(c, null, "If your account exists, a verification code has been sent.");
+    }
+
+    if (user.email_verified) {
+        return error(c, "Account is already verified.", 400);
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    await supabase
+        .from("users")
+        .update({
+            verification_token: otp,
+            verification_token_expiry: expiry,
+        })
+        .eq("id", user.id);
+
+    await sendEmailViaBrevo(
+        user.email,
+        "Verify Your Account - Ghana Highway Authority",
+        buildVerificationEmailHtml(user.name, otp)
+    );
+
+    return success(c, null, "A new verification code has been sent to your email.");
+});
+
+// POST /auth/verify-email
+app.post("/auth/verify-email", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const { email, otp } = body;
+
+    if (!email || !otp) {
+        return error(c, "Email and OTP are required", 400);
+    }
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, email, verification_token, verification_token_expiry")
+        .ilike("email", email.trim())
+        .maybeSingle();
+
+    if (!user || user.verification_token !== otp.trim()) {
+        return error(c, "Invalid verification code", 400);
+    }
+
+    if (user.verification_token_expiry && new Date(user.verification_token_expiry) < new Date()) {
+        return error(c, "Verification code has expired. Please request a new one.", 400);
+    }
+
+    const setPasswordToken = crypto.randomUUID();
+    const resetExpiry = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+
+    const { error: updErr } = await supabase
+        .from("users")
+        .update({
+            email_verified: true,
+            verification_token: null,
+            verification_token_expiry: null,
+            reset_token: setPasswordToken,
+            reset_token_expiry: resetExpiry,
+        })
+        .eq("id", user.id);
+
+    if (updErr) {
+        return error(c, "Verification failed", 500);
+    }
+
+    return success(
+        c,
+        {
+            set_password_token: setPasswordToken,
+            email: user.email,
+        },
+        "Email verified. Please set your personal password to activate your account."
+    );
+});
+
+// POST /auth/set-initial-password
+app.post("/auth/set-initial-password", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const { token, password } = body;
+
+    if (!token || !password) {
+        return error(c, "Token and password are required", 400);
+    }
+
+    if (password.length < 8) {
+        return error(c, "Password must be at least 8 characters", 400);
+    }
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, name, email, role, division, reset_token_expiry")
+        .eq("reset_token", token.trim())
+        .maybeSingle();
+
+    if (!user) {
+        return error(c, "Invalid or expired setup token. Please request a new verification code.", 400);
+    }
+
+    if (user.reset_token_expiry && new Date(user.reset_token_expiry) < new Date()) {
+        return error(c, "Setup token has expired. Please request a new verification code.", 400);
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const { error: updErr } = await supabase
+        .from("users")
+        .update({
+            password: hashedPassword,
+            status: "active",
+            reset_token: null,
+            reset_token_expiry: null,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+    if (updErr) {
+        return error(c, "Failed to set password", 500);
+    }
+
+    const jwtToken = jwt.sign(
+        { id: user.id, email: user.email, role: user.role, name: user.name },
         JWT_SECRET,
         { expiresIn: "24h" }
     );
@@ -265,16 +458,15 @@ app.post("/auth/register", async (c) => {
         c,
         {
             user: {
-                id: userId,
-                name: newUser.name,
-                email: newUser.email,
-                role: newUser.role,
-                division: newUser.division,
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                division: user.division,
             },
-            token,
+            token: jwtToken,
         },
-        "Registration successful",
-        201
+        "Password set successfully. Welcome to Ghana Highway Authority Asset Management System!"
     );
 });
 
@@ -568,6 +760,40 @@ app.post("/users", async (c) => {
 
     const { error: insertErr } = await supabase.from("users").insert(newUser);
     if (insertErr) return error(c, insertErr.message, 500);
+
+    // Send welcome/invitation email via Brevo
+    sendEmailViaBrevo(
+        newUser.email,
+        "Welcome to Ghana Highway Authority Asset Management System",
+        `
+        <div style='font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+            <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: #1e293b !important; background: #1e293b !important;'>
+                <tr>
+                    <td bgcolor='#1e293b' align='center' style='background-color: #1e293b !important; padding: 26px 12px; border-bottom: 4px solid #f59e0b; text-align: center;'>
+                        <h1 style='color: #ffffff !important; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;'>
+                            Ghana Highway Authority
+                        </h1>
+                        <p style='color: #94a3b8 !important; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;'>
+                            Asset Management System
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            <div style='padding: 40px 30px;'>
+                <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px; font-weight: 700;'>Welcome, ${newUser.name}!</h2>
+                <p style='color: #475569; line-height: 1.6; margin: 0 0 20px; font-size: 15px;'>An account has been created for you on the Ghana Highway Authority Asset Management System with the role <strong>${newUser.role}</strong> (${newUser.division} Division).</p>
+                <div style='background-color: #f1f5f9; border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;'>
+                    <p style='margin: 0 0 10px; color: #334155;'><strong>Login Email:</strong> ${newUser.email}</p>
+                    <p style='margin: 0; color: #334155;'><strong>Temporary Password:</strong> ${password}</p>
+                </div>
+                <p style='color: #64748b; font-size: 14px; margin: 0;'>Please log in and update your password under your Profile settings.</p>
+            </div>
+            <div style='background-color: #f8fafc; padding: 25px 30px; border-top: 1px solid #e2e8f0; text-align: center;'>
+                <p style='color: #94a3b8; font-size: 12px; margin: 0;'>&copy; ${new Date().getFullYear()} Ghana Highway Authority. All rights reserved.</p>
+            </div>
+        </div>
+        `
+    ).catch(() => {});
 
     return success(c, { id: userId }, "User created successfully", 201);
 });
