@@ -13,6 +13,47 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const JWT_SECRET = Deno.env.get("JWT_SECRET") || "gha_asset_manager_secret_key_2026";
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") || "";
+const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") || Deno.env.get("SMTP_FROM") || "noreply@gha.gov.gh";
+const BREVO_SENDER_NAME = Deno.env.get("BREVO_SENDER_NAME") || Deno.env.get("SMTP_FROM_NAME") || "Ghana Highway Authority";
+
+async function sendEmailViaBrevo(to: string, subject: string, htmlContent: string): Promise<boolean> {
+    if (!BREVO_API_KEY) {
+        console.warn(`[Mail] BREVO_API_KEY not configured. Email to ${to} was not sent.`);
+        return false;
+    }
+
+    try {
+        const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
+            headers: {
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json",
+            },
+            body: JSON.stringify({
+                sender: {
+                    name: BREVO_SENDER_NAME,
+                    email: BREVO_SENDER_EMAIL,
+                },
+                to: [{ email: to }],
+                subject,
+                htmlContent,
+            }),
+        });
+
+        if (response.status === 201 || response.ok) {
+            console.log(`[Mail] Email sent successfully to ${to} via Brevo`);
+            return true;
+        }
+
+        const errText = await response.text();
+        console.error(`[Mail] Brevo API error (Status ${response.status}):`, errText);
+        return false;
+    } catch (err: any) {
+        console.error(`[Mail] Network error while sending email to ${to}:`, err.message);
+        return false;
+    }
+}
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
     console.warn("Notice: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not defined in Edge Function environment.");
@@ -258,6 +299,188 @@ app.get("/auth/me", async (c) => {
 app.post("/auth/logout", (c) => {
     return success(c, null, "Logged out successfully");
 });
+
+// POST /auth/forgot-password
+app.post("/auth/forgot-password", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const { email } = body;
+
+    if (!email) {
+        return error(c, "Email is required", 400);
+    }
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, name, email")
+        .ilike("email", email.trim())
+        .maybeSingle();
+
+    if (!user) {
+        // Return success for security to avoid email enumeration
+        return success(c, null, "If your account is registered, you will receive reset instructions.");
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+
+    await supabase
+        .from("users")
+        .update({
+            reset_token: otp,
+            reset_token_expiry: expiry,
+        })
+        .eq("id", user.id);
+
+    const subject = "Password Reset Request - Ghana Highway Authority";
+    const emailMessage = `
+        <div style='font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 20px auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>
+            <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: #1e293b !important; background: #1e293b !important;'>
+                <tr>
+                    <td bgcolor='#1e293b' align='center' style='background-color: #1e293b !important; padding: 26px 12px; border-bottom: 4px solid #f59e0b; text-align: center;'>
+                        <h1 style='color: #ffffff !important; margin: 0; font-size: 18px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 800; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;'>
+                            Ghana Highway Authority
+                        </h1>
+                        <p style='color: #94a3b8 !important; margin: 6px 0 0; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;'>
+                            Asset Management System
+                        </p>
+                    </td>
+                </tr>
+            </table>
+            <div style='padding: 40px 30px;'>
+                <h2 style='color: #1e293b; margin: 0 0 20px; font-size: 20px;'>Password Reset Request</h2>
+                <p style='color: #475569; line-height: 1.6; margin: 0 0 20px;'>Hello <strong>${user.name}</strong>,</p>
+                <p style='color: #475569; line-height: 1.6; margin: 0 0 30px;'>We received a request to reset the password for your Ghana Highway Authority Asset Management System account. Please use the verification code below to proceed:</p>
+                <div style='background-color: #f1f5f9; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 30px; border: 1px dashed #cbd5e1;'>
+                    <span style='font-family: "Courier New", Courier, monospace; font-size: 36px; font-weight: bold; letter-spacing: 12px; color: #2563eb;'>${otp}</span>
+                </div>
+                <p style='color: #64748b; font-size: 14px; margin: 0 0 10px;'>This code will expire in <strong>1 hour</strong>.</p>
+                <p style='color: #64748b; font-size: 14px; margin: 0;'>If you did not request this reset, you can safely ignore this email.</p>
+            </div>
+            <div style='background-color: #f8fafc; padding: 25px 30px; border-top: 1px solid #e2e8f0; text-align: center;'>
+                <p style='color: #94a3b8; font-size: 12px; margin: 0 0 10px;'>&copy; ${new Date().getFullYear()} Ghana Highway Authority. All rights reserved.</p>
+            </div>
+        </div>
+    `;
+
+    const mailSent = await sendEmailViaBrevo(user.email, subject, emailMessage);
+    return success(c, { email_sent: mailSent }, "A password reset email has been sent to your registered address.");
+});
+
+// POST /auth/verify-reset-otp
+app.post("/auth/verify-reset-otp", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const { token } = body;
+
+    if (!token) {
+        return error(c, "OTP token is required", 400);
+    }
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, email, reset_token_expiry")
+        .eq("reset_token", token.trim())
+        .maybeSingle();
+
+    if (!user) {
+        return error(c, "Invalid or expired OTP", 400);
+    }
+
+    if (user.reset_token_expiry && new Date(user.reset_token_expiry) < new Date()) {
+        return error(c, "OTP has expired. Please request a new one.", 400);
+    }
+
+    return success(c, null, "OTP verified successfully");
+});
+
+// POST /auth/reset-password
+app.post("/auth/reset-password", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const { token, password } = body;
+
+    if (!token || !password) {
+        return error(c, "Token and new password are required", 400);
+    }
+
+    if (password.length < 8) {
+        return error(c, "Password must be at least 8 characters", 400);
+    }
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, reset_token_expiry")
+        .eq("reset_token", token.trim())
+        .maybeSingle();
+
+    if (!user) {
+        return error(c, "Invalid or expired reset token", 400);
+    }
+
+    if (user.reset_token_expiry && new Date(user.reset_token_expiry) < new Date()) {
+        return error(c, "Reset token has expired. Please request a new one.", 400);
+    }
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+    const { error: updErr } = await supabase
+        .from("users")
+        .update({
+            password: hashedPassword,
+            reset_token: null,
+            reset_token_expiry: null,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+    if (updErr) {
+        return error(c, `Failed to reset password: ${updErr.message}`, 500);
+    }
+
+    return success(c, null, "Password has been reset successfully. You can now login.");
+});
+
+// PUT & POST /auth/change-password
+const handleChangePassword = async (c: any) => {
+    const authUser = await authenticate(c);
+    if (!authUser) return error(c, "Unauthorized", 401);
+
+    const body = await c.req.json().catch(() => ({}));
+    const { current_password, new_password } = body;
+
+    if (!current_password || !new_password) {
+        return error(c, "Current and new password are required", 400);
+    }
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("id, password")
+        .eq("id", authUser.id)
+        .maybeSingle();
+
+    if (!user) return error(c, "User not found", 404);
+
+    const isMatch = bcrypt.compareSync(current_password, user.password);
+    if (!isMatch) {
+        return error(c, "Current password is incorrect", 401);
+    }
+
+    if (new_password.length < 8) {
+        return error(c, "New password must be at least 8 characters", 400);
+    }
+
+    const hashedPassword = bcrypt.hashSync(new_password, 10);
+    const { error: updErr } = await supabase
+        .from("users")
+        .update({
+            password: hashedPassword,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+    if (updErr) return error(c, updErr.message, 500);
+    return success(c, null, "Password changed successfully");
+};
+
+app.put("/auth/change-password", handleChangePassword);
+app.post("/auth/change-password", handleChangePassword);
 
 // ============================================================
 // 5. User Management Endpoints
