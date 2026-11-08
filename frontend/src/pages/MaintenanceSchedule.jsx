@@ -63,10 +63,17 @@ const MaintenanceSchedule = () => {
     const { assets, updateAsset } = useAssets();
 
     const approvedAssets = (assets || []).filter(a => a.approval_status === 'Approved');
-    // Allow scheduling maintenance for assets needing maintenance or actively in service
-    const maintenanceTargetAssets = approvedAssets.filter(a =>
-        a.status !== 'Disposed' && a.status !== 'Archived' && a.status !== 'Scrapped' && a.status !== 'Sold'
-    );
+    // Show only approved assets whose status is "Under Maintenance" or "Maintenance" (or "Faulty")
+    // and remove any asset that has already been scheduled for maintenance (active task exists)
+    const maintenanceTargetAssets = approvedAssets.filter(a => {
+        const isUnderMaintenance = a.status === 'Under Maintenance' || a.status === 'Maintenance' || a.status === 'Faulty';
+        if (!isUnderMaintenance) return false;
+
+        const hasActiveTask = (maintenanceTasks || []).some(
+            t => String(t.asset_id) === String(a.id) && t.status !== 'Completed' && t.status !== 'Cancelled'
+        );
+        return !hasActiveTask;
+    });
 
     // Form State
     const [formData, setFormData] = useState({
@@ -346,13 +353,18 @@ const MaintenanceSchedule = () => {
                             className="w-full bg-bg-hover border border-border-color rounded-lg px-4 py-2 text-text-primary focus:border-primary outline-none"
                             required
                         >
-                            <option value="">Select Asset...</option>
+                            <option value="">{maintenanceTargetAssets.length === 0 ? '-- No assets currently awaiting maintenance --' : 'Select an Asset'}</option>
                             {maintenanceTargetAssets.map(asset => (
                                 <option key={asset.id} value={asset.id}>
                                     {asset.name} ({asset.id}) - {asset.status}
                                 </option>
                             ))}
                         </select>
+                        {maintenanceTargetAssets.length === 0 && (
+                            <p className="text-[11px] text-text-muted mt-1.5">
+                                Only assets marked &quot;Under Maintenance&quot; that do not already have an active scheduled task appear here.
+                            </p>
+                        )}
                     </div>
 
                     <div>
@@ -794,7 +806,29 @@ const MaintenanceSchedule = () => {
                                             if (selectedTask.isVirtual || selectedTask.id?.toString().startsWith('INV-')) {
                                                 success = true;
                                             } else {
-                                                const result = await updateMaintenanceTask(selectedTask.id, { ...selectedTask, status: newStatus, ...completionData });
+                                                const taskPayload = {
+                                                    id: selectedTask.id,
+                                                    asset_id: selectedTask.asset_id,
+                                                    asset_type: selectedTask.asset_type || 'General',
+                                                    description: selectedTask.description || selectedTask.type || 'Maintenance',
+                                                    task_type: selectedTask.task_type || selectedTask.type || 'Routine Check',
+                                                    priority: selectedTask.priority || 'Medium',
+                                                    status: newStatus,
+                                                    scheduled_date: selectedTask.scheduled_date || selectedTask.date,
+                                                    estimated_cost: parseFloat(selectedTask.estimated_cost || selectedTask.estimatedCost) || 0,
+                                                    actual_cost: completionData.actual_cost !== undefined ? completionData.actual_cost : (parseFloat(selectedTask.actual_cost) || 0),
+                                                    parts_maintained: completionData.parts_maintained !== undefined ? completionData.parts_maintained : (selectedTask.parts_maintained || selectedTask.partsNeeded || ''),
+                                                    notes: selectedTask.notes || '',
+                                                    ...completionData
+                                                };
+                                                // Strip virtual / joined properties
+                                                delete taskPayload.asset;
+                                                delete taskPayload.date;
+                                                delete taskPayload.effectiveStatus;
+                                                delete taskPayload.assignedTo;
+                                                delete taskPayload.isVirtual;
+
+                                                const result = await updateMaintenanceTask(selectedTask.id, taskPayload);
                                                 success = result.success;
                                             }
 

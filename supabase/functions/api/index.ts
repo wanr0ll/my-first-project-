@@ -1198,6 +1198,78 @@ function sanitizeAssetPayload(data: Record<string, any>): Record<string, any> {
     return cleaned;
 }
 
+const ALLOWED_MAINTENANCE_COLUMNS = new Set([
+    "id",
+    "asset_id",
+    "asset_type",
+    "description",
+    "task_type",
+    "priority",
+    "status",
+    "assigned_to",
+    "scheduled_date",
+    "completed_date",
+    "estimated_cost",
+    "actual_cost",
+    "parts_maintained",
+    "receipt_url",
+    "notes",
+    "created_by",
+    "created_at",
+    "updated_at",
+]);
+
+const MAINTENANCE_FIELD_MAPPING: Record<string, string> = {
+    assetId: "asset_id",
+    assetType: "asset_type",
+    taskType: "task_type",
+    type: "task_type",
+    scheduledDate: "scheduled_date",
+    date: "scheduled_date",
+    completedDate: "completed_date",
+    estimatedCost: "estimated_cost",
+    actualCost: "actual_cost",
+    partsMaintained: "parts_maintained",
+    partsNeeded: "parts_maintained",
+    receiptUrl: "receipt_url",
+    receipt: "receipt_url",
+    assignedTo: "assigned_to",
+    createdBy: "created_by",
+};
+
+function sanitizeMaintenancePayload(data: Record<string, any>): Record<string, any> {
+    const cleaned: Record<string, any> = {};
+
+    for (const [rawKey, rawVal] of Object.entries(data)) {
+        // Skip joined / UI-only fields
+        if (["asset", "effectiveStatus", "isVirtual", "assigned_to_name"].includes(rawKey)) {
+            continue;
+        }
+
+        const key = MAINTENANCE_FIELD_MAPPING[rawKey] || rawKey;
+        if (!ALLOWED_MAINTENANCE_COLUMNS.has(key)) {
+            continue; // Skip fields not present in schema
+        }
+
+        let val = rawVal;
+        if (val === "" || val === undefined) {
+            val = null;
+        } else if (key === "estimated_cost" || key === "actual_cost") {
+            if (typeof val === "string") val = val.replace(/[^0-9.-]/g, "");
+            const num = Number(val);
+            val = isNaN(num) || val === "" ? null : num;
+        } else if (key === "assigned_to") {
+            if (typeof val === "string" && !val.startsWith("USR_") && val !== "USR_SUPER") {
+                val = null;
+            }
+        }
+
+        cleaned[key] = val;
+    }
+
+    return cleaned;
+}
+
 const UNIQUE_ASSET_FIELDS: { column: string; label: string }[] = [
     { column: "asset_tag", label: "Asset Tag Number" },
     { column: "serial_number", label: "Serial Number" },
@@ -1311,12 +1383,12 @@ app.post("/assets", async (c) => {
 });
 
 // PUT /assets and PUT /assets/transfer
-app.put("/assets", async (c) => {
+const handleUpdateAsset = async (c: any) => {
     const authUser = await authenticate(c);
     if (!authUser) return error(c, "Unauthorized", 401);
 
     const body = await c.req.json().catch(() => ({}));
-    const id = body.id || c.req.query("id");
+    const id = c.req.param("id") || body.id || c.req.query("id");
     if (!id) return error(c, "Asset ID is required", 400);
 
     // Duplicate check for unique identifiers (exclude self)
@@ -1328,6 +1400,13 @@ app.put("/assets", async (c) => {
             409
         );
     }
+
+    // Fetch existing asset to track diffs, history, and status changes
+    const { data: oldAsset } = await supabase
+        .from("assets")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
 
     const updates = sanitizeAssetPayload({
         ...body,
@@ -1342,8 +1421,92 @@ app.put("/assets", async (c) => {
     const { error: updErr } = await supabase.from("assets").update(updates).eq("id", id);
     if (updErr) return error(c, updErr.message, 500);
 
+    const assetName = updates.name || oldAsset?.name || `Asset #${id}`;
+
+    // Calculate diffs between oldAsset and updates
+    const diffList: string[] = [];
+    const oldDiffVals: Record<string, any> = {};
+    const newDiffVals: Record<string, any> = {};
+
+    for (const [k, v] of Object.entries(updates)) {
+        if (k === "updated_at" || k === "id") continue;
+        const oldVal = (oldAsset as any)?.[k];
+        if (String(oldVal ?? "") !== String(v ?? "")) {
+            const displayKey = k.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+            diffList.push(`${displayKey}: "${oldVal ?? ""}" -> "${v ?? ""}"`);
+            oldDiffVals[k] = oldVal ?? null;
+            newDiffVals[k] = v ?? null;
+        }
+    }
+
+    const statusChanged = updates.status && oldAsset?.status && updates.status !== oldAsset.status;
+    const approvalChanged = updates.approval_status && oldAsset?.approval_status && updates.approval_status !== oldAsset.approval_status;
+
+    let action = "Asset Updated";
+    let desc = diffList.length > 0
+        ? `Updated fields on '${assetName}': ${diffList.join(", ")}`
+        : `Asset details updated for '${assetName}'`;
+
+    if (statusChanged) {
+        const newStatus = updates.status;
+        const oldStatus = oldAsset.status;
+        if (newStatus === "Archived") {
+            action = "Asset Archived";
+            desc = `Asset '${assetName}' archived from ${oldStatus}` + (body.archive_reason ? `. Reason: ${body.archive_reason}` : "");
+        } else if (["Disposed", "Scrapped", "Sold"].includes(newStatus)) {
+            action = "Asset Disposed";
+            desc = `Asset '${assetName}' disposed (${newStatus}) from ${oldStatus}` + (body.disposal_reason ? `. Reason: ${body.disposal_reason}` : "");
+        } else if (["Disposed", "Scrapped", "Sold"].includes(oldStatus) && !["Disposed", "Scrapped", "Sold"].includes(newStatus)) {
+            action = "Asset Restored";
+            desc = `Asset '${assetName}' restored from ${oldStatus} to ${newStatus}` + (body.restore_reason ? `. Reason: ${body.restore_reason}` : "");
+        } else {
+            action = "Asset Status Changed";
+            desc = `Asset '${assetName}' status changed from ${oldStatus} to ${newStatus}`;
+        }
+
+        const notifType = (newStatus === "Faulty" || newStatus === "Under Maintenance" || newStatus === "Disposed") ? "warning" : "info";
+        notifyAdmins(
+            "Asset Status Changed",
+            desc,
+            notifType,
+            id,
+            [authUser.id]
+        );
+    } else if (approvalChanged) {
+        action = updates.approval_status === "Approved" ? "Asset Approved" : (updates.approval_status === "Rejected" ? "Asset Rejected" : "Asset Approval Changed");
+        desc = `Asset '${assetName}' was ${updates.approval_status.toLowerCase()} by ${authUser.name || authUser.email}`;
+
+        notifyAdmins(
+            action,
+            desc,
+            updates.approval_status === "Approved" ? "success" : "warning",
+            id,
+            [authUser.id]
+        );
+    }
+
+    if (diffList.length > 0 || statusChanged || approvalChanged) {
+        supabase
+            .from("asset_history")
+            .insert({
+                asset_id: id,
+                asset_type: oldAsset?.asset_type || oldAsset?.major_category || updates.asset_type || "Asset",
+                action,
+                description: desc,
+                old_values: Object.keys(oldDiffVals).length > 0 ? oldDiffVals : (oldAsset || {}),
+                new_values: Object.keys(newDiffVals).length > 0 ? newDiffVals : updates,
+                performed_by: authUser.id,
+                performed_at: new Date().toISOString(),
+            })
+            .then(() => {});
+    }
+
     return success(c, null, "Asset updated successfully");
-});
+};
+
+app.put("/assets", handleUpdateAsset);
+app.put("/assets/:category", handleUpdateAsset);
+app.put("/assets/:category/:id", handleUpdateAsset);
 
 app.put("/assets/transfer", async (c) => {
     const authUser = await authenticate(c);
@@ -1695,8 +1858,9 @@ app.post("/maintenance", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const taskId = body.id || generateId("MT");
 
+    const sanitized = sanitizeMaintenancePayload(body);
     const newTask = {
-        ...body,
+        ...sanitized,
         id: taskId,
         created_by: authUser.id,
         created_at: new Date().toISOString(),
@@ -1705,6 +1869,27 @@ app.post("/maintenance", async (c) => {
 
     const { error: insErr } = await supabase.from("maintenance_tasks").insert(newTask);
     if (insErr) return error(c, insErr.message, 500);
+
+    // Audit log
+    supabase
+        .from("asset_history")
+        .insert({
+            asset_id: newTask.asset_id,
+            asset_type: newTask.asset_type || "Asset",
+            action: "Maintenance Scheduled",
+            description: `Maintenance task '${newTask.description || newTask.task_type}' scheduled for ${newTask.scheduled_date || "upcoming"}`,
+            performed_by: authUser.id,
+            performed_at: new Date().toISOString(),
+        })
+        .then(() => {});
+
+    notifyAdmins(
+        "Maintenance Task Scheduled",
+        `Maintenance task for asset #${newTask.asset_id} has been scheduled.`,
+        "info",
+        newTask.asset_id,
+        [authUser.id]
+    );
 
     return success(c, { id: taskId }, "Maintenance task created successfully", 201);
 });
@@ -1738,11 +1923,58 @@ const handleUpdateMaintenance = async (c: any) => {
     const id = c.req.param("id") || body.id || c.req.query("id");
     if (!id) return error(c, "Task ID is required", 400);
 
-    const updates = { ...body, updated_at: new Date().toISOString() };
-    delete updates.id;
+    const sanitized = sanitizeMaintenancePayload(body);
+    delete sanitized.id;
+
+    if (sanitized.status === "Completed" && !sanitized.completed_date) {
+        sanitized.completed_date = new Date().toISOString().split("T")[0];
+    }
+
+    const updates = {
+        ...sanitized,
+        updated_at: new Date().toISOString(),
+    };
+
+    if (Object.keys(updates).length <= 1 && updates.updated_at) {
+        return success(c, null, "Maintenance task updated successfully");
+    }
 
     const { error: updErr } = await supabase.from("maintenance_tasks").update(updates).eq("id", id);
     if (updErr) return error(c, updErr.message, 500);
+
+    // Audit log and notification if status is updated
+    if (sanitized.status) {
+        const isCompleted = sanitized.status === "Completed";
+        let historyDesc = `Maintenance task #${id} updated to status '${sanitized.status}'`;
+        if (isCompleted) {
+            historyDesc = "Maintenance completed.";
+            if (sanitized.parts_maintained) historyDesc += ` Parts: ${sanitized.parts_maintained}.`;
+            if (sanitized.actual_cost) historyDesc += ` Actual cost: GHS ${sanitized.actual_cost}.`;
+        }
+
+        const assetId = body.asset_id || sanitized.asset_id;
+        if (assetId) {
+            supabase
+                .from("asset_history")
+                .insert({
+                    asset_id: assetId,
+                    asset_type: body.asset_type || sanitized.asset_type || "Asset",
+                    action: isCompleted ? "Asset Maintained" : "Maintenance Status Changed",
+                    description: historyDesc,
+                    performed_by: authUser.id,
+                    performed_at: new Date().toISOString(),
+                })
+                .then(() => {});
+        }
+
+        notifyAdmins(
+            "Maintenance Task Updated",
+            `Maintenance task #${id} status changed to '${sanitized.status}'.`,
+            isCompleted ? "success" : "info",
+            assetId || null,
+            [authUser.id]
+        );
+    }
 
     return success(c, null, "Maintenance task updated successfully");
 };
@@ -1773,21 +2005,27 @@ const handleGetHistory = async (c: any) => {
     const authUser = await authenticate(c);
     if (!authUser) return error(c, "Unauthorized", 401);
 
-    const limit = parseInt(c.req.query("limit") || "50", 10);
+    const limit = parseInt(c.req.query("limit") || "200", 10);
     const assetId = c.req.query("asset_id");
 
     let dbQuery = supabase.from("asset_history").select("*, users(name)");
     if (assetId) dbQuery = dbQuery.eq("asset_id", assetId);
 
-    const { data: logs, error: hErr } = await dbQuery
+    let { data: logs, error: hErr } = await dbQuery
         .order("performed_at", { ascending: false })
         .limit(limit);
 
-    if (hErr) return error(c, hErr.message, 500);
+    if (hErr) {
+        // Fallback without relation join if users(name) join fails
+        let fallbackQuery = supabase.from("asset_history").select("*");
+        if (assetId) fallbackQuery = fallbackQuery.eq("asset_id", assetId);
+        const fbRes = await fallbackQuery.order("performed_at", { ascending: false }).limit(limit);
+        logs = fbRes.data;
+    }
 
     const formatted = (logs || []).map((l: any) => ({
         ...l,
-        performed_by_name: l.users?.name || "System",
+        performed_by_name: l.users?.name || l.performed_by || "System",
     }));
 
     return success(c, formatted, "Activity retrieved successfully");
@@ -1800,18 +2038,24 @@ app.get("/activity", handleGetHistory);
 // ============================================================
 // 9. Notifications Endpoints
 // ============================================================
-async function notifyAdmins(title: string, message: string, type: string = "info", relatedAssetId: string | null = null) {
+async function notifyAdmins(
+    title: string,
+    message: string,
+    type: string = "info",
+    relatedAssetId: string | null = null,
+    extraUserIds: string[] = []
+) {
     try {
         const { data: adminUsers } = await supabase
             .from("users")
             .select("id")
-            .in("role", ["Super Admin", "Administrator", "Admin"]);
+            .in("role", ["Super Admin", "Administrator", "Admin", "Director", "CEO"]);
 
         const userIds = adminUsers && adminUsers.length > 0
             ? adminUsers.map((u: any) => u.id)
-            : ["USR_SUPER"];
+            : [];
 
-        const uniqueIds = Array.from(new Set([...userIds, "USR_SUPER"]));
+        const uniqueIds = Array.from(new Set([...userIds, ...extraUserIds, "USR_SUPER"]));
 
         const notifRows = uniqueIds.map(uid => ({
             user_id: uid,
@@ -1823,7 +2067,12 @@ async function notifyAdmins(title: string, message: string, type: string = "info
             created_at: new Date().toISOString(),
         }));
 
-        await supabase.from("notifications").insert(notifRows);
+        const { error: insErr } = await supabase.from("notifications").insert(notifRows);
+        if (insErr) {
+            for (const row of notifRows) {
+                await supabase.from("notifications").insert(row);
+            }
+        }
     } catch (err: any) {
         console.warn("Failed to notify admins:", err?.message);
     }

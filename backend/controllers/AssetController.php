@@ -159,9 +159,11 @@ class AssetController
         $result = $this->assetModel->update($id, $data);
 
         if ($result['success']) {
+            $assetName = $data['name'] ?? $oldAsset['name'] ?? "Asset #$id";
+
             if ($this->historyModel) {
                 $action = 'Asset Updated';
-                $desc = "Asset details updated for '{$data['name']}'";
+                $desc = "Asset details updated for '{$assetName}'";
 
                 if (isset($data['status']) && $oldAsset && $data['status'] !== $oldAsset['status']) {
                     $newStatus = $data['status'];
@@ -189,13 +191,16 @@ class AssetController
                         $action = 'Asset Status Changed';
                         $desc = "Asset status changed from {$oldStatus} to {$newStatus}";
                     }
+                } elseif (isset($data['approval_status']) && $oldAsset && $data['approval_status'] !== $oldAsset['approval_status']) {
+                    $action = $data['approval_status'] === 'Approved' ? 'Asset Approved' : 'Asset Rejected';
+                    $desc = "Asset '{$assetName}' was " . strtolower($data['approval_status']) . " by " . ($user['name'] ?? $user['email'] ?? 'User');
                 }
 
                 $this->historyModel->log($id, 'Asset', $action, $desc, $user['id'] ?? 'System', $oldAsset, $data);
             }
 
             if ($this->notificationModel && isset($data['status']) && $oldAsset && $data['status'] !== $oldAsset['status']) {
-                $notifMessage = "Asset '{$data['name']}' status changed from {$oldAsset['status']} to {$data['status']}.";
+                $notifMessage = "Asset '{$assetName}' status changed from {$oldAsset['status']} to {$data['status']}.";
                 if ($data['status'] === 'Archived' && !empty($data['archive_reason'])) {
                     $notifMessage .= " Reason: " . $data['archive_reason'];
                 } elseif (in_array($data['status'], ['Disposed', 'Scrapped', 'Sold']) && !empty($data['disposal_reason'])) {
@@ -207,6 +212,13 @@ class AssetController
                     'Asset Status Changed',
                     $notifMessage,
                     'warning',
+                    $id
+                );
+            } elseif ($this->notificationModel && isset($data['approval_status']) && $oldAsset && $data['approval_status'] !== $oldAsset['approval_status']) {
+                $this->notificationModel->notifyAdmins(
+                    'Asset ' . $data['approval_status'],
+                    "Asset '{$assetName}' was " . strtolower($data['approval_status']) . " by " . ($user['name'] ?? $user['email'] ?? 'User'),
+                    $data['approval_status'] === 'Approved' ? 'success' : 'warning',
                     $id
                 );
             }

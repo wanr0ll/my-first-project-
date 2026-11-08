@@ -137,7 +137,15 @@ class MaintenanceController
                 );
             } else {
                 $statusMsg = $data['status'] ?? $task['status'];
-                $this->historyModel->log($id, 'Task', 'Maintenance Updated', "Maintenance task status updated to '{$statusMsg}'", $user['id'] ?? 'System');
+                $this->historyModel->log(
+                    $task['asset_id'],
+                    $task['asset_type'] ?? 'Asset',
+                    'Maintenance Updated',
+                    "Maintenance task #{$id} status updated to '{$statusMsg}'",
+                    $user['id'] ?? 'System',
+                    $task,
+                    array_merge($task, $data)
+                );
             }
         }
 

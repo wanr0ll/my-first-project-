@@ -89,9 +89,11 @@ const AssetHistory = () => {
                         const oldV = typeof item.old_values === 'string' ? JSON.parse(item.old_values) : item.old_values;
                         const newV = typeof item.new_values === 'string' ? JSON.parse(item.new_values) : item.new_values;
                         const diffs = [];
-                        for (const k in newV) {
-                            if (oldV[k] != newV[k] && !['updated_at', 'id', 'created_at', 'last_service_date'].includes(k) && k !== 'notes') {
-                                diffs.push(`${k}: ${oldV[k] || 'empty'} -> ${newV[k] || 'empty'}`);
+                        const keys = new Set([...Object.keys(oldV || {}), ...Object.keys(newV || {})]);
+                        for (const k of keys) {
+                            if (String(oldV?.[k] ?? '') !== String(newV?.[k] ?? '') && !['updated_at', 'id', 'created_at', 'last_service_date'].includes(k) && k !== 'notes') {
+                                const displayKey = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                diffs.push(`${displayKey}: "${oldV?.[k] ?? 'empty'}" → "${newV?.[k] ?? 'empty'}"`);
                             }
                         }
                         if (diffs.length > 0) changes = diffs.join('\n');

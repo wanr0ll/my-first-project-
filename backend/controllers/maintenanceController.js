@@ -107,11 +107,13 @@ class MaintenanceController {
         } else {
             const statusMsg = data.status || existing.status;
             historyModel.log(
-                id,
-                'Task',
+                existing.asset_id,
+                existing.asset_type || 'Asset',
                 'Maintenance Updated',
                 `Maintenance task status updated to '${statusMsg}'`,
-                user.id
+                user.id,
+                existing,
+                { ...existing, ...data }
             ).catch(() => {});
         }
 
