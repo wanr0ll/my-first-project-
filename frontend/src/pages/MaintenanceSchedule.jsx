@@ -202,7 +202,8 @@ const MaintenanceSchedule = () => {
             date: new Date().toISOString().split('T')[0],
             scheduled_date: new Date().toISOString().split('T')[0],
             priority: 'Medium',
-            assignedTo: 'In-House Tech',
+            serviceProvider: 'GHA Workshop',
+            assignedTo: 'GHA Workshop',
             isVirtual: true
         }));
 
@@ -213,14 +214,19 @@ const MaintenanceSchedule = () => {
         const assetTitle = t.asset || linkedAsset?.name || t.description || `Asset #${t.asset_id}`;
         const taskDate = t.date || t.scheduled_date || (t.created_at ? t.created_at.split('T')[0] : 'Scheduled');
         const taskType = t.type || t.task_type || t.description || 'Maintenance';
-        const assignedTech = t.assignedTo || t.assigned_to_name || t.serviceProvider || 'In-House Tech';
+        
+        // Extract workshop / provider from notes if stored there
+        const providerMatch = (t.notes || '').match(/Provider:\s*([^.\n]+)/);
+        const providerFromNotes = providerMatch ? providerMatch[1].trim() : '';
+        const resolvedProvider = t.service_provider || t.serviceProvider || t.workshop || (providerFromNotes && providerFromNotes !== 'Pending' ? providerFromNotes : '') || (t.assignedTo && t.assignedTo !== 'In-House Tech' ? t.assignedTo : '') || t.assigned_to_name || 'GHA Workshop';
 
         return {
             ...t,
             asset: assetTitle,
             date: taskDate,
             type: taskType,
-            assignedTo: assignedTech
+            serviceProvider: resolvedProvider,
+            assignedTo: resolvedProvider
         };
     });
 
@@ -321,7 +327,7 @@ const MaintenanceSchedule = () => {
                                 )}
                             </div>
                             <h3 className="text-lg font-bold text-text-primary group-hover:text-accent transition-colors mb-1 truncate">{task.asset}</h3>
-                            <p className="text-text-secondary text-sm font-medium">{task.type} <span className="mx-1 opacity-30">|</span> Tech: <span className="text-text-primary">{task.assignedTo}</span></p>
+                            <p className="text-text-secondary text-sm font-medium">{task.type} <span className="mx-1 opacity-30">|</span> Workshop: <span className="text-text-primary">{task.serviceProvider || task.assignedTo || 'GHA Workshop'}</span></p>
                         </div>
 
                         <div className="flex items-center gap-4 shrink-0">
@@ -622,8 +628,8 @@ const MaintenanceSchedule = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1">Assigned Technician / Provider</p>
-                                <p className="text-sm font-semibold text-text-primary">{selectedTask.assignedTo || selectedTask.serviceProvider || 'Pending'}</p>
+                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1">Service Provider / Workshop</p>
+                                <p className="text-sm font-semibold text-text-primary">{selectedTask.serviceProvider || selectedTask.assignedTo || 'GHA Workshop'}</p>
                             </div>
                             <div className="p-3 rounded-xl bg-white/5 border border-white/5">
                                 <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1">Scheduled Date</p>
@@ -657,7 +663,7 @@ const MaintenanceSchedule = () => {
                             </div>
                         ) : (
                             <div className="p-4 rounded-xl bg-bg-hover/50 border border-border-color">
-                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Technician's Instructions</p>
+                                <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-2">Service / Workshop Instructions</p>
                                 <p className="text-xs text-text-secondary">Perform standard ${selectedTask.type} protocol for ${selectedTask.asset}. Ensure all receipts are kept for GHA audit compliance.</p>
                             </div>
                         )}
