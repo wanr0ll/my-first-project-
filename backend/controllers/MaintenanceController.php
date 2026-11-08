@@ -8,11 +8,15 @@ class MaintenanceController
 {
     private $maintenanceModel;
     private $historyModel;
+    private $assetModel;
+    private $notificationModel;
 
-    public function __construct($maintenanceModel, $historyModel = null)
+    public function __construct($maintenanceModel, $historyModel = null, $assetModel = null, $notificationModel = null)
     {
         $this->maintenanceModel = $maintenanceModel;
         $this->historyModel = $historyModel;
+        $this->assetModel = $assetModel;
+        $this->notificationModel = $notificationModel;
     }
 
     /**
@@ -135,6 +139,52 @@ class MaintenanceController
                     null,
                     array_merge($task, $data)
                 );
+
+                // Auto-restore asset status to Active
+                if ($this->assetModel && !empty($task['asset_id'])) {
+                    $existingAsset = $this->assetModel->getById($task['asset_id']);
+                    if ($existingAsset && $existingAsset['status'] !== 'Active') {
+                        $this->assetModel->update($task['asset_id'], ['status' => 'Active']);
+
+                        $this->historyModel->log(
+                            $task['asset_id'],
+                            $existingAsset['asset_type'] ?? 'Asset',
+                            'Asset Status Changed',
+                            "Asset '{$existingAsset['name']}' restored to Active after maintenance completion.",
+                            $user['id'] ?? 'System',
+                            ['status' => $existingAsset['status']],
+                            ['status' => 'Active']
+                        );
+
+                        if ($this->notificationModel) {
+                            $this->notificationModel->notifyAdmins(
+                                'Asset Restored to Active',
+                                "Asset '{$existingAsset['name']}' has been restored to Active after maintenance was completed.",
+                                'success',
+                                $task['asset_id']
+                            );
+                        }
+                    }
+                }
+            } elseif (isset($data['status']) && $data['status'] === 'In Progress') {
+                $statusMsg = $data['status'];
+                $this->historyModel->log(
+                    $task['asset_id'],
+                    $task['asset_type'] ?? 'Asset',
+                    'Maintenance Updated',
+                    "Maintenance task #{$id} status updated to '{$statusMsg}'",
+                    $user['id'] ?? 'System',
+                    $task,
+                    array_merge($task, $data)
+                );
+
+                // Ensure asset is marked Under Maintenance
+                if ($this->assetModel && !empty($task['asset_id'])) {
+                    $existingAsset = $this->assetModel->getById($task['asset_id']);
+                    if ($existingAsset && $existingAsset['status'] !== 'Under Maintenance') {
+                        $this->assetModel->update($task['asset_id'], ['status' => 'Under Maintenance']);
+                    }
+                }
             } else {
                 $statusMsg = $data['status'] ?? $task['status'];
                 $this->historyModel->log(

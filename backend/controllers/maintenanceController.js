@@ -1,5 +1,7 @@
 const maintenanceModel = require('../models/maintenanceModel');
+const assetModel = require('../models/assetModel');
 const historyModel = require('../models/historyModel');
+const notificationModel = require('../models/notificationModel');
 const { success, error, paginated } = require('../utils/response');
 
 class MaintenanceController {
@@ -104,6 +106,58 @@ class MaintenanceController {
                 existing,
                 { ...existing, ...data }
             ).catch(() => {});
+
+            // Auto-restore asset status to Active
+            if (existing.asset_id) {
+                try {
+                    const linkedAsset = await assetModel.getById(existing.asset_id);
+                    if (linkedAsset && linkedAsset.status !== 'Active') {
+                        await assetModel.update(existing.asset_id, { status: 'Active' });
+
+                        historyModel.log(
+                            existing.asset_id,
+                            linkedAsset.asset_type || 'Asset',
+                            'Asset Status Changed',
+                            `Asset '${linkedAsset.name}' restored to Active after maintenance completion.`,
+                            user.id,
+                            { status: linkedAsset.status },
+                            { status: 'Active' }
+                        ).catch(() => {});
+
+                        notificationModel.notifyAdmins(
+                            'Asset Restored to Active',
+                            `Asset '${linkedAsset.name}' has been restored to Active after maintenance was completed.`,
+                            'success',
+                            existing.asset_id
+                        ).catch(() => {});
+                    }
+                } catch (assetErr) {
+                    console.warn('Failed to auto-restore asset status:', assetErr.message);
+                }
+            }
+        } else if (data.status === 'In Progress') {
+            const statusMsg = data.status;
+            historyModel.log(
+                existing.asset_id,
+                existing.asset_type || 'Asset',
+                'Maintenance Updated',
+                `Maintenance task status updated to '${statusMsg}'`,
+                user.id,
+                existing,
+                { ...existing, ...data }
+            ).catch(() => {});
+
+            // Ensure asset is Under Maintenance
+            if (existing.asset_id) {
+                try {
+                    const linkedAsset = await assetModel.getById(existing.asset_id);
+                    if (linkedAsset && linkedAsset.status !== 'Under Maintenance') {
+                        await assetModel.update(existing.asset_id, { status: 'Under Maintenance' });
+                    }
+                } catch (assetErr) {
+                    console.warn('Failed to sync asset Under Maintenance:', assetErr.message);
+                }
+            }
         } else {
             const statusMsg = data.status || existing.status;
             historyModel.log(

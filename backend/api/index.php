@@ -94,7 +94,7 @@ $notificationModel = new Notification($db);
 $authController = new AuthController($userModel, $notificationModel);
 $userController = new UserController($userModel);
 $assetController = new AssetController($assetModel, $historyModel, $notificationModel);
-$maintenanceController = new MaintenanceController($maintenanceModel, $historyModel);
+$maintenanceController = new MaintenanceController($maintenanceModel, $historyModel, $assetModel, $notificationModel);
 $historyController = new HistoryController($historyModel);
 $notificationController = new NotificationController($notificationModel);
 

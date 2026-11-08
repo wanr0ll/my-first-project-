@@ -849,23 +849,26 @@ const MaintenanceSchedule = () => {
                                                     }
                                                 }
 
-                                                // 3. Sync asset status
-                                                let newAssetStatus = null;
-                                                if (newStatus === 'Completed') {
-                                                    newAssetStatus = 'Active';
-                                                } else if (newStatus === 'In Progress') {
-                                                    newAssetStatus = 'Under Maintenance';
-                                                }
-
-                                                if (newAssetStatus && selectedTask.asset_id) {
+                                                // 3. Sync asset status back to Active when Completed
+                                                if (newStatus === 'Completed' && selectedTask.asset_id) {
+                                                    const linkedAsset = assetMap.get(String(selectedTask.asset_id));
                                                     await updateAsset({
                                                         id: selectedTask.asset_id,
-                                                        status: newAssetStatus,
-                                                        category: selectedTask.asset_type || 'General'
-                                                    });
+                                                        ...(linkedAsset || {}),
+                                                        status: 'Active',
+                                                    }, { silent: true });
+                                                    addToast(`Maintenance completed. Asset restored to Active.`, 'success');
+                                                } else if (newStatus === 'In Progress' && selectedTask.asset_id) {
+                                                    const linkedAsset = assetMap.get(String(selectedTask.asset_id));
+                                                    await updateAsset({
+                                                        id: selectedTask.asset_id,
+                                                        ...(linkedAsset || {}),
+                                                        status: 'Under Maintenance',
+                                                    }, { silent: true });
+                                                    addToast(`Task moved to In Progress.`, 'success');
+                                                } else {
+                                                    addToast(`Status updated to ${newStatus}`, 'success');
                                                 }
-
-                                                addToast(`Status updated to ${newStatus}`, 'success');
                                                 setIsDetailModalOpen(false);
                                             }
                                         }}

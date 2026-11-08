@@ -1945,6 +1945,7 @@ const handleUpdateMaintenance = async (c: any) => {
     // Audit log and notification if status is updated
     if (sanitized.status) {
         const isCompleted = sanitized.status === "Completed";
+        const isInProgress = sanitized.status === "In Progress";
         let historyDesc = `Maintenance task #${id} updated to status '${sanitized.status}'`;
         if (isCompleted) {
             historyDesc = "Maintenance completed.";
@@ -1965,6 +1966,59 @@ const handleUpdateMaintenance = async (c: any) => {
                     performed_at: new Date().toISOString(),
                 })
                 .then(() => {});
+
+            // Auto-restore asset status based on maintenance outcome
+            if (isCompleted || isInProgress) {
+                const targetAssetStatus = isCompleted ? "Active" : "Under Maintenance";
+
+                // Fetch current asset to build history diff
+                const { data: currentAsset } = await supabase
+                    .from("assets")
+                    .select("id, name, status, asset_type")
+                    .eq("id", assetId)
+                    .maybeSingle();
+
+                // Only update if the status actually differs
+                if (currentAsset && currentAsset.status !== targetAssetStatus) {
+                    const { error: assetUpdErr } = await supabase
+                        .from("assets")
+                        .update({
+                            status: targetAssetStatus,
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", assetId);
+
+                    if (!assetUpdErr) {
+                        const assetHistoryDesc = isCompleted
+                            ? `Asset '${currentAsset.name}' restored to Active after maintenance completion.`
+                            : `Asset '${currentAsset.name}' status set to Under Maintenance (task in progress).`;
+
+                        supabase
+                            .from("asset_history")
+                            .insert({
+                                asset_id: assetId,
+                                asset_type: currentAsset.asset_type || "Asset",
+                                action: isCompleted ? "Asset Status Changed" : "Asset Status Changed",
+                                description: assetHistoryDesc,
+                                old_values: { status: currentAsset.status },
+                                new_values: { status: targetAssetStatus },
+                                performed_by: authUser.id,
+                                performed_at: new Date().toISOString(),
+                            })
+                            .then(() => {});
+
+                        if (isCompleted) {
+                            notifyAdmins(
+                                "Asset Restored to Active",
+                                `Asset '${currentAsset.name}' has been restored to Active after maintenance was completed.`,
+                                "success",
+                                assetId,
+                                [authUser.id]
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         notifyAdmins(
