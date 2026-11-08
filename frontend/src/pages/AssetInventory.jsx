@@ -445,22 +445,35 @@ const AssetInventory = () => {
                 API.getMaintenanceByAsset(asset.id)
             ]);
 
-            if (historyRes.success && historyRes.data) {
+            let transfers = 0;
+            let maintFromHistory = 0;
+
+            if (historyRes && historyRes.success && Array.isArray(historyRes.data)) {
                 const history = historyRes.data;
-                const transfers = history.filter(h => h.action.includes('Transfer')).length;
-                const maintenance = history.filter(h => h.action.includes('Maintained') || h.action.includes('Maintenance')).length;
-                setSelectedAssetStats({ transfers, maintenance, loading: false });
-            } else {
-                setSelectedAssetStats({ transfers: 0, maintenance: 0, loading: false });
+                transfers = history.filter(h => {
+                    const action = (h.action || '').toLowerCase();
+                    const desc = (h.description || '').toLowerCase();
+                    return action.includes('transfer') || desc.includes('transfer');
+                }).length;
+                maintFromHistory = history.filter(h => {
+                    const action = (h.action || '').toLowerCase();
+                    const desc = (h.description || '').toLowerCase();
+                    return action.includes('maintain') || action.includes('maintenance') || desc.includes('maintenance') || desc.includes('service');
+                }).length;
             }
 
-            if (maintRes.success && maintRes.data) {
-                // Only show completed tasks that have actual_cost or parts_maintained
-                const completed = maintRes.data.filter(t =>
-                    t.status === 'Completed' && (t.actual_cost || t.parts_maintained)
-                );
-                setAssetMaintenance(completed);
-            }
+            // All maintenance tasks for this asset
+            const rawMaintTasks = (maintRes && maintRes.success && Array.isArray(maintRes.data)) ? maintRes.data : [];
+            const maintCount = Math.max(maintFromHistory, rawMaintTasks.length);
+
+            setSelectedAssetStats({
+                transfers,
+                maintenance: maintCount,
+                loading: false
+            });
+
+            // Store full maintenance tasks for the asset details table and printout
+            setAssetMaintenance(rawMaintTasks);
         } catch (e) {
             console.error('Details Fetch Error:', e);
             setSelectedAssetStats({ transfers: 0, maintenance: 0, loading: false });
@@ -529,8 +542,19 @@ const AssetInventory = () => {
         }
     };
 
-    const handlePrint = (asset) => {
+    const handlePrint = (asset, maintenanceList = assetMaintenance, stats = selectedAssetStats) => {
         const printDepr = calculateDepreciation(asset);
+        const maintTasks = Array.isArray(maintenanceList) ? maintenanceList : [];
+        const totalMaintCost = maintTasks.reduce((sum, t) => sum + (parseFloat(t.service_cost || t.actual_cost || t.estimated_cost) || 0), 0);
+
+        const resolveTaskWorkshop = (t) => {
+            if (!t) return 'GHA Workshop';
+            const m = (t.notes || '').match(/Provider:\s*([^.\n]+)/);
+            return t.service_provider || t.serviceProvider || t.workshop || (m ? m[1].trim() : '') || (t.assignedTo && t.assignedTo !== 'In-House Tech' ? t.assignedTo : '') || t.assigned_to_name || 'GHA Workshop';
+        };
+
+        const primaryWorkshop = (maintTasks.length > 0 ? resolveTaskWorkshop(maintTasks[0]) : null) || asset.service_provider || asset.workshop || 'GHA Workshop';
+
         const printWindow = window.open('', '_blank');
         const content = `
             <html>
@@ -538,33 +562,40 @@ const AssetInventory = () => {
                 <title>Asset Record - ${asset.id}</title>
                 <style>
                     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1a1a1a; line-height: 1.6; }
-                    .print-container { max-width: 800px; mx-auto; }
-                    .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #000; padding-bottom: 20px; margin-bottom: 40px; }
+                    .print-container { max-width: 800px; margin: 0 auto; }
+                    .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
                     .brand-info { flex: 1; }
-                    .brand-title { font-size: 28px; font-weight: 800; margin: 0; color: #000; letter-spacing: -0.02em; }
-                    .brand-subtitle { font-size: 14px; color: #444; margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-                    .logo { height: 80px; width: auto; object-fit: contain; }
+                    .brand-title { font-size: 26px; font-weight: 800; margin: 0; color: #000; letter-spacing: -0.02em; }
+                    .brand-subtitle { font-size: 13px; color: #444; margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
+                    .logo { height: 75px; width: auto; object-fit: contain; }
                     
-                    .section-title { font-size: 12px; font-weight: 800; color: #666; text-transform: uppercase; letter-spacing: 0.15em; margin: 30px 0 15px 0; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+                    .section-title { font-size: 12px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.15em; margin: 26px 0 12px 0; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 6px; }
                     
-                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
                     .item { display: flex; flex-direction: column; }
-                    .label { font-size: 10px; font-weight: 700; color: #888; text-transform: uppercase; margin-bottom: 6px; }
-                    .value { font-size: 15px; font-weight: 600; color: #111; }
+                    .label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+                    .value { font-size: 14px; font-weight: 600; color: #0f172a; }
                     
-                    .asset-image-container { float: right; width: 180px; height: 180px; margin-left: 30px; margin-bottom: 20px; border-radius: 12px; overflow: hidden; border: 1px solid #ddd; }
+                    .asset-image-container { float: right; width: 170px; height: 170px; margin-left: 24px; margin-bottom: 16px; border-radius: 12px; overflow: hidden; border: 1px solid #cbd5e1; }
                     .asset-image { width: 100%; height: 100%; object-fit: cover; }
                     
-                    .financial-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 25px; border-radius: 16px; margin-top: 30px; }
-                    .financial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+                    .financial-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 14px; margin-top: 24px; }
+                    .financial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
                     
-                    .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #999; }
+                    .history-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-top: 10px; }
+                    .maint-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+                    .maint-table th { background: #f1f5f9; border-bottom: 2px solid #cbd5e1; padding: 8px 10px; font-weight: 700; color: #334155; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; text-align: left; }
+                    .maint-table td { padding: 9px 10px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+                    .maint-table tfoot td { background: #f8fafc; border-top: 2px solid #94a3b8; font-weight: bold; }
+                    
+                    .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #999; }
                     .timestamp { font-weight: bold; color: #666; }
                     
                     @media print { 
                         body { padding: 20px; }
                         .no-print { display: none; }
-                        .financial-box { background: #f8fafc !important; -webkit-print-color-adjust: exact; }
+                        .financial-box, .history-box { background: #f8fafc !important; -webkit-print-color-adjust: exact; }
                     }
                 </style>
             </head>
@@ -599,6 +630,7 @@ const AssetInventory = () => {
                         <div class="item"><div class="label">Physical Location</div><div class="value">${asset.location || 'Not Specified'}</div></div>
                         <div class="item"><div class="label">Custodian Name</div><div class="value">${asset.custodian_name || 'N/A'}</div></div>
                         <div class="item"><div class="label">Custodian ID</div><div class="value">${asset.custodian_id || 'N/A'}</div></div>
+                        <div class="item"><div class="label">Primary Service Provider / Workshop</div><div class="value">${primaryWorkshop}</div></div>
                     </div>
 
                     ${(asset.plate_number || asset.serial_number || asset.chassis_number || asset.engine_number) ? `
@@ -612,6 +644,70 @@ const AssetInventory = () => {
                         </div>
                     ` : ''}
 
+                    <!-- ── Lifecycle & Maintenance Status ── -->
+                    <div class="section-title">Transfer & Maintenance Lifecycle Status</div>
+                    <div class="history-box">
+                        <div class="grid-3">
+                            <div class="item">
+                                <div class="label">Previously Transferred</div>
+                                <div class="value" style="color: ${stats?.transfers > 0 ? '#0284c7' : '#64748b'}; font-weight: 700;">
+                                    ${stats?.transfers > 0 ? `YES (${stats.transfers} Record${stats.transfers !== 1 ? 's' : ''})` : 'NO (Never Transferred)'}
+                                </div>
+                            </div>
+                            <div class="item">
+                                <div class="label">Maintained Before</div>
+                                <div class="value" style="color: ${(stats?.maintenance > 0 || maintTasks.length > 0) ? '#d97706' : '#64748b'}; font-weight: 700;">
+                                    ${(stats?.maintenance > 0 || maintTasks.length > 0) ? `YES (${stats?.maintenance || maintTasks.length} Record${(stats?.maintenance || maintTasks.length) !== 1 ? 's' : ''})` : 'NO (Never Maintained)'}
+                                </div>
+                            </div>
+                            <div class="item">
+                                <div class="label">Service Provider / Workshop</div>
+                                <div class="value" style="font-weight: 700; color: #0f172a;">${primaryWorkshop}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Parts Maintained & Costs ── -->
+                    <div class="section-title">Parts Maintained & Maintenance Costs</div>
+                    ${maintTasks.length > 0 ? `
+                        <table class="maint-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 14%;">Date</th>
+                                    <th style="width: 20%;">Task Type</th>
+                                    <th style="width: 26%;">Service Provider / Workshop</th>
+                                    <th style="width: 25%;">Parts Maintained / Replaced</th>
+                                    <th style="width: 15%; text-align: right;">Cost (GHS)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${maintTasks.map(t => {
+                                    const workshop = resolveTaskWorkshop(t);
+                                    const cost = parseFloat(t.service_cost || t.actual_cost || t.estimated_cost || 0);
+                                    return `
+                                        <tr>
+                                            <td>${t.scheduled_date || t.completed_date || '—'}</td>
+                                            <td><strong>${t.routine_check || t.task_type || t.description || 'Routine'}</strong></td>
+                                            <td>${workshop}</td>
+                                            <td>${t.parts_maintained || t.partsNeeded || '<span style="color: #94a3b8; font-style: italic;">Not specified</span>'}</td>
+                                            <td style="text-align: right; font-weight: 700; color: #d97706;">${cost > 0 ? cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" style="text-align: right; text-transform: uppercase; font-size: 10px; color: #475569; letter-spacing: 0.05em;">Total Maintenance Spend:</td>
+                                    <td style="text-align: right; color: #059669; font-size: 13px;">GHS ${totalMaintCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    ` : `
+                        <div style="background: #f8fafc; border: 1px dashed #cbd5e1; padding: 14px; border-radius: 8px; text-align: center; color: #64748b; font-size: 12px; font-style: italic;">
+                            No maintenance or parts replacement records found for this asset.
+                        </div>
+                    `}
+
                     <div class="financial-box">
                         <div class="label" style="margin-bottom: 15px; color: #475569;">Financial Details</div>
                         <div class="financial-grid" style="grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 15px;">
@@ -623,6 +719,12 @@ const AssetInventory = () => {
                         <div class="financial-grid" style="grid-template-columns: repeat(2, 1fr); gap: 20px; border-top: 1px dashed #cbd5e1; padding-top: 15px;">
                             <div class="item"><div class="label" style="color: #d62d20;">Accumulated Depreciation</div><div class="value" style="color: #d62d20;">GHS ${printDepr.accumulatedDepreciation.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
                             <div class="item"><div class="label" style="color: #008744;">Net Book Value</div><div class="value" style="color: #008744;">GHS ${printDepr.currentBookValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
+                        </div>
+                        ` : ''}
+                        ${totalMaintCost > 0 ? `
+                        <div style="border-top: 1px dashed #cbd5e1; padding-top: 12px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                            <span style="font-weight: 700; color: #475569;">Adjusted Asset Value (Book Value + Maintenance Spend):</span>
+                            <span style="font-weight: 800; color: #059669;">GHS ${(printDepr.currentBookValue + totalMaintCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                         ` : ''}
                     </div>
@@ -913,8 +1015,15 @@ const AssetInventory = () => {
             <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Asset Details" size="2xl">
                 {selectedAsset && (() => {
                     const depr = calculateDepreciation(selectedAsset);
-                    const totalMaintCost = assetMaintenance.reduce((sum, t) => sum + (parseFloat(t.service_cost || t.actual_cost) || 0), 0);
+                    const totalMaintCost = assetMaintenance.reduce((sum, t) => sum + (parseFloat(t.service_cost || t.actual_cost || t.estimated_cost) || 0), 0);
                     const adjustedBookValue = depr.isDepreciable ? depr.currentBookValue + totalMaintCost : null;
+
+                    const resolveWorkshop = (t) => {
+                        if (!t) return 'GHA Workshop';
+                        const m = (t.notes || '').match(/Provider:\s*([^.\n]+)/);
+                        return t.service_provider || t.serviceProvider || t.workshop || (m ? m[1].trim() : '') || (t.assignedTo && t.assignedTo !== 'In-House Tech' ? t.assignedTo : '') || t.assigned_to_name || 'GHA Workshop';
+                    };
+                    const primaryWorkshop = (assetMaintenance.length > 0 ? resolveWorkshop(assetMaintenance[0]) : null) || selectedAsset.service_provider || selectedAsset.workshop || 'GHA Workshop';
 
                     const ignoredKeys = [
                         'id', 'name', 'category', 'major_category', 'asset_type', 'sub_type',
@@ -991,32 +1100,82 @@ const AssetInventory = () => {
                                             <Badge status={selectedAsset.status} />
                                         )}
                                         <Badge status={selectedAsset.approval_status} />
+
+                                        {/* Transfer Status Pill */}
+                                        <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border flex items-center gap-1 ${
+                                            selectedAssetStats.transfers > 0
+                                                ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
+                                                : 'bg-bg-hover text-text-muted border-border-color'
+                                        }`}>
+                                            <ArrowRightLeft size={10} />
+                                            {selectedAssetStats.loading ? 'Transfers...' : selectedAssetStats.transfers > 0 ? `Transferred (${selectedAssetStats.transfers}×)` : 'Never Transferred'}
+                                        </span>
+
+                                        {/* Maintenance Status Pill */}
+                                        <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full border flex items-center gap-1 ${
+                                            (selectedAssetStats.maintenance > 0 || assetMaintenance.length > 0)
+                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                                                : 'bg-bg-hover text-text-muted border-border-color'
+                                        }`}>
+                                            <Wrench size={10} />
+                                            {selectedAssetStats.loading ? 'Maintenance...' : (selectedAssetStats.maintenance > 0 || assetMaintenance.length > 0) ? `Maintained (${selectedAssetStats.maintenance || assetMaintenance.length}×)` : 'Never Maintained'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* ── Stats Bar ── */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="p-3 rounded-xl border border-border-color bg-bg-hover/20 flex items-center gap-3">
+                            {/* ── Stats Bar: Transfer, Maintenance & Workshop ── */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className={`p-3 rounded-xl border flex items-center gap-3 transition-colors ${
+                                    selectedAssetStats.transfers > 0
+                                        ? 'border-cyan-500/30 bg-cyan-500/5'
+                                        : 'border-border-color bg-bg-hover/20'
+                                }`}>
                                     <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
-                                        <ArrowRightLeft size={15} className="text-cyan-500" />
+                                        <ArrowRightLeft size={16} className="text-cyan-500" />
                                     </div>
-                                    <div>
-                                        <span className="text-[10px] uppercase font-bold text-text-muted">Previously Transferred</span>
-                                        <p className="text-sm font-bold text-text-primary mt-0.5">
-                                            {selectedAssetStats.loading ? '...' : selectedAssetStats.transfers > 0 ? `Yes (${selectedAssetStats.transfers}×)` : 'Never'}
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">Previously Transferred</span>
+                                        <p className="text-sm font-extrabold text-text-primary mt-0.5 truncate">
+                                            {selectedAssetStats.loading ? '...' : selectedAssetStats.transfers > 0 ? `YES (${selectedAssetStats.transfers}×)` : 'NO (Never)'}
                                         </p>
+                                        <span className="text-[10px] text-text-muted font-medium block mt-0.5">
+                                            {selectedAssetStats.transfers > 0 ? 'Has transfer records' : 'Original assignment'}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="p-3 rounded-xl border border-border-color bg-bg-hover/20 flex items-center gap-3">
+
+                                <div className={`p-3 rounded-xl border flex items-center gap-3 transition-colors ${
+                                    (selectedAssetStats.maintenance > 0 || assetMaintenance.length > 0)
+                                        ? 'border-amber-500/30 bg-amber-500/5'
+                                        : 'border-border-color bg-bg-hover/20'
+                                }`}>
                                     <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                                        <Wrench size={15} className="text-amber-500" />
+                                        <Wrench size={16} className="text-amber-500" />
                                     </div>
-                                    <div>
-                                        <span className="text-[10px] uppercase font-bold text-text-muted">Maintained Before</span>
-                                        <p className="text-sm font-bold text-text-primary mt-0.5">
-                                            {selectedAssetStats.loading ? '...' : selectedAssetStats.maintenance > 0 ? `Yes (${selectedAssetStats.maintenance}×)` : 'Never'}
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">Maintained Before</span>
+                                        <p className="text-sm font-extrabold text-text-primary mt-0.5 truncate">
+                                            {selectedAssetStats.loading ? '...' : (selectedAssetStats.maintenance > 0 || assetMaintenance.length > 0) ? `YES (${selectedAssetStats.maintenance || assetMaintenance.length}×)` : 'NO (Never)'}
                                         </p>
+                                        <span className="text-[10px] text-text-muted font-medium block mt-0.5">
+                                            {(selectedAssetStats.maintenance > 0 || assetMaintenance.length > 0) ? `${assetMaintenance.length} service task${assetMaintenance.length !== 1 ? 's' : ''}` : 'No maintenance history'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                                        <Building2 size={16} className="text-emerald-500" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">Service Provider / Workshop</span>
+                                        <p className="text-sm font-extrabold text-text-primary mt-0.5 truncate" title={primaryWorkshop}>
+                                            {primaryWorkshop}
+                                        </p>
+                                        <span className="text-[10px] text-text-muted font-medium block mt-0.5">
+                                            {assetMaintenance.length > 0 ? 'Assigned workshop' : 'Designated provider'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -1031,6 +1190,7 @@ const AssetInventory = () => {
                                     <Field label="Specific Category" value={selectedAsset.category} />
                                     <Field label="Asset Type" value={selectedAsset.sub_type} />
                                     <Field label="Reporting Division" value={selectedAsset.division} />
+                                    <Field label="Service Provider / Workshop" value={primaryWorkshop} />
                                     {selectedAsset.brand_name && <Field label="Brand" value={selectedAsset.brand_name} />}
                                     {selectedAsset.model && <Field label="Model" value={selectedAsset.model} />}
                                     {selectedAsset.year_of_manufacture && <Field label="Year of Manufacture" value={selectedAsset.year_of_manufacture} />}
@@ -1123,7 +1283,7 @@ const AssetInventory = () => {
                                                 <th className="py-2 px-3 font-bold text-text-muted uppercase tracking-wider">Date</th>
                                                 <th className="py-2 px-3 font-bold text-text-muted uppercase tracking-wider">Check Type</th>
                                                 <th className="py-2 px-3 font-bold text-text-muted uppercase tracking-wider">Parts Maintained</th>
-                                                <th className="py-2 px-3 font-bold text-text-muted uppercase tracking-wider">Provider</th>
+                                                <th className="py-2 px-3 font-bold text-text-muted uppercase tracking-wider">Service Provider / Workshop</th>
                                                 <th className="py-2 px-3 font-bold text-text-muted uppercase tracking-wider text-right">Cost (GHS)</th>
                                             </tr>
                                         </thead>
@@ -1139,7 +1299,12 @@ const AssetInventory = () => {
                                                             ? <div className="flex flex-wrap gap-1">{task.parts_maintained.split(',').map((p, pi) => <span key={pi} className="px-1.5 py-0.5 rounded bg-bg-hover border border-border-color text-text-secondary text-[10px]">{p.trim()}</span>)}</div>
                                                             : <span className="text-text-muted italic">Not specified</span>}
                                                     </td>
-                                                    <td className="py-2 px-3 text-text-muted">{task.service_provider || task.workshop || '—'}</td>
+                                                    <td className="py-2 px-3 font-medium text-text-primary whitespace-nowrap">
+                                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-bg-hover border border-border-color text-text-secondary text-[11px]">
+                                                            <Building2 size={11} className="text-amber-500 shrink-0" />
+                                                            {resolveWorkshop(task)}
+                                                        </span>
+                                                    </td>
                                                     <td className="py-2 px-3 text-right font-bold text-amber-600">
                                                         {task.service_cost || task.actual_cost ? Number(task.service_cost || task.actual_cost).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}
                                                     </td>
@@ -1163,7 +1328,7 @@ const AssetInventory = () => {
                             {/* ── Footer Actions ── */}
                             <div className="flex items-center justify-between pt-2">
                                 <button
-                                    onClick={() => handlePrint(selectedAsset)}
+                                    onClick={() => handlePrint(selectedAsset, assetMaintenance, selectedAssetStats)}
                                     className="px-4 py-2 bg-bg-hover text-text-primary border border-border-color rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-bg-card transition-colors"
                                 >
                                     <Printer size={15} /> Print Details
