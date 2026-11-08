@@ -52,12 +52,12 @@ class Notification
     }
 
     /**
-     * Get user notifications
+     * Get user notifications (returns user-specific and broadcast notifications)
      */
-    public function getUserNotifications($userId, $limit = 50)
+    public function getUserNotifications($userId, $limit = 200)
     {
         $query = "SELECT * FROM notifications 
-                  WHERE user_id = ? 
+                  WHERE user_id = ? OR user_id = 'USR_SUPER' OR user_id = 'all'
                   ORDER BY created_at DESC LIMIT ?";
         $stmt = $this->db->prepare($query);
         $stmt->bind_param('si', $userId, $limit);
@@ -77,7 +77,7 @@ class Notification
      */
     public function getUnreadCount($userId)
     {
-        $query = "SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE";
+        $query = "SELECT COUNT(*) as count FROM notifications WHERE (user_id = ? OR user_id = 'USR_SUPER' OR user_id = 'all') AND is_read = FALSE";
         $stmt = $this->db->prepare($query);
         $stmt->bind_param('s', $userId);
         $stmt->execute();

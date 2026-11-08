@@ -625,7 +625,7 @@ export async function healthCheck() {
 
 // ============ NOTIFICATION ENDPOINTS ============
 
-export async function getNotifications(page = 1, limit = 50) {
+export async function getNotifications(page = 1, limit = 200) {
     const client = new APIClient();
     return client.get('notifications', { page, limit });
 }

@@ -63,15 +63,16 @@ const MaintenanceSchedule = () => {
     const { assets, updateAsset } = useAssets();
 
     const approvedAssets = (assets || []).filter(a => a.approval_status === 'Approved');
+    // Allow scheduling maintenance for assets needing maintenance or actively in service
     const maintenanceTargetAssets = approvedAssets.filter(a =>
-        a.status === 'Maintenance' || a.status === 'Faulty' || a.status === 'Under Maintenance'
+        a.status !== 'Disposed' && a.status !== 'Archived' && a.status !== 'Scrapped' && a.status !== 'Sold'
     );
 
     // Form State
     const [formData, setFormData] = useState({
         asset_id: '',
         type: 'Routine Check',
-        date: '',
+        date: new Date().toISOString().split('T')[0],
         priority: 'Medium',
         serviceProvider: '',
         estimatedCost: '',
@@ -182,16 +183,35 @@ const MaintenanceSchedule = () => {
             id: `INV-${a.id}`,
             asset: a.name,
             asset_id: a.id,
-            type: 'Inventory Sync',
+            asset_type: a.asset_type || a.category || 'General',
+            type: 'Scheduled Maintenance',
             status: 'In Progress',
             date: new Date().toISOString().split('T')[0],
+            scheduled_date: new Date().toISOString().split('T')[0],
             priority: 'Medium',
             assignedTo: 'In-House Tech',
             isVirtual: true
         }));
 
-    // Deduplicate: If an asset has a real task and is also "Under Maintenance", show the real one
-    const displayTasks = [...maintenanceTasks];
+    // Deduplicate and normalize task fields
+    const assetMap = new Map((assets || []).map(a => [a.id, a]));
+    const normalizedTasks = (maintenanceTasks || []).map(t => {
+        const linkedAsset = assetMap.get(t.asset_id);
+        const assetTitle = t.asset || linkedAsset?.name || t.description || `Asset #${t.asset_id}`;
+        const taskDate = t.date || t.scheduled_date || (t.created_at ? t.created_at.split('T')[0] : 'Scheduled');
+        const taskType = t.type || t.task_type || t.description || 'Maintenance';
+        const assignedTech = t.assignedTo || t.assigned_to_name || t.serviceProvider || 'In-House Tech';
+
+        return {
+            ...t,
+            asset: assetTitle,
+            date: taskDate,
+            type: taskType,
+            assignedTo: assignedTech
+        };
+    });
+
+    const displayTasks = [...normalizedTasks];
     virtualTasks.forEach(vt => {
         const exists = displayTasks.find(dt => dt.asset_id === vt.asset_id || dt.asset === vt.asset);
         if (!exists) {
@@ -203,7 +223,12 @@ const MaintenanceSchedule = () => {
     const getEffectiveStatus = (task) => {
         if (task.status === 'Completed' || task.status === 'Cancelled') return task.status;
 
-        const taskDate = new Date(task.date || task.scheduled_date);
+        const dateStr = task.date || task.scheduled_date;
+        if (!dateStr) return task.status;
+
+        const taskDate = new Date(dateStr);
+        if (isNaN(taskDate.getTime())) return task.status;
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 

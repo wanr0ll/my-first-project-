@@ -1745,7 +1745,7 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
                                         <select name="status" value={formData.status} onChange={handleInputChange} className="input-field">
                                             <option>Active</option>
                                             <option>Inactive</option>
-                                            <option>Maintaince</option>
+                                            <option>Maintenance</option>
                                             <option>Disposed</option>
                                         </select>
                                     </div>
@@ -2115,6 +2115,7 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
                                             <div className="col-span-2 lg:col-span-1">
                                                 <label className="label">Serial Number</label>
                                                 <input name="serial" value={formData.serial} onChange={handleInputChange} className="input-field" placeholder="Manufacturer Serial Number" />
+                                                {renderDupWarning('serial')}
                                             </div>
                                             <div className="col-span-2 lg:col-span-1">
                                                 <label className="label">Does the asset have an Asset Tag?</label>
@@ -2126,12 +2127,14 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
                                                     <div className="animate-in slide-in-from-top-2 duration-200">
                                                         <input name="assetTag" value={formData.assetTag} onChange={handleInputChange} className={`input-field ${errors.assetTag ? 'border-red-500' : ''}`} placeholder="Enter Asset Tag... (e.g. GHA-XYZ)" />
                                                         {errors.assetTag && <p className="text-red-500 text-xs mt-1">{errors.assetTag}</p>}
+                                                        {renderDupWarning('assetTag')}
                                                     </div>
                                                 )}
                                             </div>
                                             <div className="col-span-2 lg:col-span-1">
                                                 <label className="label">Desk No</label>
                                                 <input name="deskNo" value={formData.deskNo} onChange={handleInputChange} className="input-field" placeholder="e.g., DSK-05" />
+                                                {renderDupWarning('deskNo')}
                                             </div>
                                         </div>
                                     </div>
@@ -2804,6 +2807,7 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
                                             <div>
                                                 <label className="label">License Key / Reference No.</label>
                                                 <input name="licenseKey" value={formData.licenseKey} onChange={handleInputChange} className="input-field" placeholder="License / Serial Key" />
+                                                {renderDupWarning('licenseKey')}
                                             </div>
                                             <div>
                                                 <label className="label">Support / Expiry Date</label>
@@ -2959,10 +2963,12 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
                                                         <label className="label">Plate Number</label>
                                                         <input name="plate" value={formData.plate} onChange={handleInputChange} className={`input-field ${errors.plate ? 'border-red-500' : ''}`} placeholder="GT-1234-23" />
                                                         {errors.plate && <p className="text-red-500 text-xs mt-1">{errors.plate}</p>}
+                                                        {renderDupWarning('plate')}
                                                     </div>
                                                     <div>
                                                         <label className="label">Chassis Number</label>
                                                         <input name="chassis" value={formData.chassis} onChange={handleInputChange} className="input-field" />
+                                                        {renderDupWarning('chassis')}
                                                     </div>
                                                     <div>
                                                         <label className="label">Does the asset have an Asset Tag?</label>
@@ -2974,6 +2980,7 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
                                                             <div className="animate-in slide-in-from-top-2 duration-200">
                                                                 <input name="assetTag" value={formData.assetTag} onChange={handleInputChange} className={`input-field ${errors.assetTag ? 'border-red-500' : ''}`} placeholder="Enter Asset Tag... (e.g. GHA-XYZ)" />
                                                                 {errors.assetTag && <p className="text-red-500 text-xs mt-1">{errors.assetTag}</p>}
+                                                                {renderDupWarning('assetTag')}
                                                             </div>
                                                         )}
                                                     </div>

@@ -1833,19 +1833,21 @@ app.get("/notifications", async (c) => {
     const authUser = await authenticate(c);
     if (!authUser) return error(c, "Unauthorized", 401);
 
-    const isAdmin = authUser.role === "Super Admin" || authUser.role === "Administrator" || authUser.role === "Admin";
+    const isAdmin = authUser.role === "Super Admin" || authUser.role === "Administrator" || authUser.role === "Admin" || authUser.role === "Director" || authUser.role === "CEO";
+
+    const limit = parseInt(c.req.query("limit") || "200", 10);
 
     let dbQuery = supabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(limit);
 
     if (isAdmin) {
-        // Admins can see notifications addressed to them, or to USR_SUPER (system broadcasts)
-        dbQuery = dbQuery.or(`user_id.eq.${authUser.id},user_id.eq.USR_SUPER`);
+        // Admins can see notifications addressed to them, or to USR_SUPER (system broadcasts) or 'all'
+        dbQuery = dbQuery.or(`user_id.eq.${authUser.id},user_id.eq.USR_SUPER,user_id.eq.all`);
     } else {
-        dbQuery = dbQuery.eq("user_id", authUser.id);
+        dbQuery = dbQuery.or(`user_id.eq.${authUser.id},user_id.eq.all`);
     }
 
     const { data: notifs, error: nErr } = await dbQuery;

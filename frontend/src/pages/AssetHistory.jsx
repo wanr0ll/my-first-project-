@@ -41,45 +41,75 @@ const AssetHistory = () => {
     const fetchAllHistory = useCallback(async () => {
         setLoading(true);
         try {
-            // Fetch history for each asset and flatten into one timeline
             const allAssets = assets || [];
-            if (allAssets.length === 0) { setHistory([]); return; }
+            const assetMap = new Map(allAssets.map(a => [a.id, a]));
 
-            const historyArrays = await Promise.all(
-                allAssets.map(async (a) => {
-                    try {
-                        const resp = await API.getAssetHistory(a.id);
-                        if (resp.success && Array.isArray(resp.data)) {
-                            return resp.data.map(h => {
-                                let changes = h.changes;
-                                if (!changes && h.old_values && h.new_values) {
-                                    try {
-                                        const oldV = JSON.parse(h.old_values);
-                                        const newV = JSON.parse(h.new_values);
-                                        const diffs = [];
-                                        for (const key in newV) {
-                                            if (oldV[key] != newV[key] && !['updated_at', 'id', 'created_at', 'last_service_date'].includes(key) && key !== 'notes') {
-                                                diffs.push(`${key}: ${oldV[key] || 'empty'} -> ${newV[key] || 'empty'}`);
-                                            }
-                                        }
-                                        if (diffs.length > 0) {
-                                            changes = diffs.join('\n');
-                                        }
-                                    } catch (e) { }
-                                }
-                                return { ...h, changes, assetName: a.name, assetId: a.id };
-                            });
+            // 1. Fetch system-wide recent activity log (covers all assets, including created/deleted/transferred)
+            let generalLogs = [];
+            try {
+                const recentResp = await API.getRecentActivity(200);
+                if (recentResp && recentResp.success && Array.isArray(recentResp.data)) {
+                    generalLogs = recentResp.data;
+                }
+            } catch (e) {
+                console.warn('Could not fetch global activity logs:', e);
+            }
+
+            // 2. Also fetch per-asset logs for assets to catch detailed diffs
+            let perAssetLogs = [];
+            if (allAssets.length > 0) {
+                // Query up to 25 active assets in parallel to avoid browser thread starvation
+                const sampledAssets = allAssets.slice(0, 30);
+                const results = await Promise.all(
+                    sampledAssets.map(async (a) => {
+                        try {
+                            const resp = await API.getAssetHistory(a.id, 50);
+                            return (resp.success && Array.isArray(resp.data)) ? resp.data : [];
+                        } catch {
+                            return [];
                         }
-                        return [];
-                    } catch { return []; }
-                })
-            );
+                    })
+                );
+                perAssetLogs = results.flat();
+            }
 
-            const flat = historyArrays.flat().sort((a, b) =>
-                new Date(b.performed_at) - new Date(a.performed_at)
-            );
-            setHistory(flat);
+            // 3. Deduplicate by log id or combination of asset_id + performed_at + action
+            const seenKeys = new Set();
+            const combined = [];
+
+            for (const item of [...generalLogs, ...perAssetLogs]) {
+                const key = item.id ? `id-${item.id}` : `${item.asset_id}-${item.performed_at}-${item.action}`;
+                if (seenKeys.has(key)) continue;
+                seenKeys.add(key);
+
+                const linkedAsset = assetMap.get(item.asset_id);
+                let changes = item.changes;
+                if (!changes && item.old_values && item.new_values) {
+                    try {
+                        const oldV = typeof item.old_values === 'string' ? JSON.parse(item.old_values) : item.old_values;
+                        const newV = typeof item.new_values === 'string' ? JSON.parse(item.new_values) : item.new_values;
+                        const diffs = [];
+                        for (const k in newV) {
+                            if (oldV[k] != newV[k] && !['updated_at', 'id', 'created_at', 'last_service_date'].includes(k) && k !== 'notes') {
+                                diffs.push(`${k}: ${oldV[k] || 'empty'} -> ${newV[k] || 'empty'}`);
+                            }
+                        }
+                        if (diffs.length > 0) changes = diffs.join('\n');
+                    } catch (e) { }
+                }
+
+                combined.push({
+                    ...item,
+                    changes,
+                    assetName: linkedAsset?.name || item.asset_name || `Asset #${item.asset_id || 'N/A'}`,
+                    assetId: item.asset_id || ''
+                });
+            }
+
+            combined.sort((a, b) => new Date(b.performed_at || 0) - new Date(a.performed_at || 0));
+            setHistory(combined);
         } catch (err) {
+            console.error('History fetch error:', err);
             addToast('Failed to load history', 'error');
         } finally {
             setLoading(false);

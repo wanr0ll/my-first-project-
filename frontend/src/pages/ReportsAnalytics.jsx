@@ -100,18 +100,28 @@ const ReportsAnalytics = () => {
         });
 
         approvedAssetsList.forEach(asset => {
-            const stat = (asset.status || asset.Status || '').toString().toLowerCase();
-            const cond = (asset.asset_condition || asset.condition || '').toString().toLowerCase();
+            const rawStat = (asset.status || asset.Status || '').toString().trim().toLowerCase();
+            const cond = (asset.asset_condition || asset.condition || '').toString().trim().toLowerCase();
 
-            if (stat === 'active') aCount++;
-            else if (stat === 'in maintenance' || stat === 'maintenance') mCount++;
-            else if (stat === 'inactive') iCount++;
-            else if (stat === 'disposed') dCount++;
-            else if (stat === 'archived') archCount++;
+            if (rawStat === 'active') {
+                aCount++;
+            } else if (rawStat === 'maintenance' || rawStat === 'maintaince' || rawStat === 'under maintenance' || rawStat === 'in maintenance' || rawStat === 'repair' || rawStat === 'faulty') {
+                mCount++;
+            } else if (rawStat === 'inactive') {
+                iCount++;
+            } else if (rawStat === 'disposed' || rawStat === 'scrapped' || rawStat === 'sold') {
+                dCount++;
+            } else if (rawStat === 'archived') {
+                archCount++;
+            }
 
-            if (stat === 'good' || cond === 'good' || cond === 'new' || cond === 'excellent') gCount++;
-            else if (stat === 'fair' || cond === 'fair') fairC++;
-            else if (stat === 'poor' || cond === 'poor') pCount++;
+            if (cond === 'good' || cond === 'new' || cond === 'excellent' || rawStat === 'good' || rawStat === 'new') {
+                gCount++;
+            } else if (cond === 'fair' || rawStat === 'fair') {
+                fairC++;
+            } else if (cond === 'poor' || cond === 'damaged' || cond === 'faulty' || rawStat === 'poor' || rawStat === 'damaged' || rawStat === 'faulty') {
+                pCount++;
+            }
         });
 
         return {
