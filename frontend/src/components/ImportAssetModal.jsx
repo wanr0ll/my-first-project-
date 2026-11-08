@@ -681,6 +681,7 @@ const ImportAssetModal = ({ isOpen, onClose }) => {
                 if (!asset.majorCategory) asset.majorCategory = 'Fixed Asset';
                 if (!asset.assetType) asset.assetType = 'Moveable';
                 if (!asset.status) asset.status = 'Active';
+                asset.approval_status = 'Pending';
                 asset.approvalStatus = 'Pending';
                 return asset;
             });

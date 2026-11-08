@@ -227,6 +227,8 @@ try {
                     $assetController->bulkImport();
                 } elseif ($action === 'upload_receipt') {
                     $assetController->uploadReceipt();
+                } elseif ($action === 'check_duplicate') {
+                    $assetController->checkDuplicate();
                 } else {
                     $assetController->create();
                 }

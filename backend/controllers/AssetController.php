@@ -85,6 +85,18 @@ class AssetController
         // Force new manual assets to require approval
         $data['approvalStatus'] = 'Pending';
 
+        // ── Duplicate check ──────────────────────────────────────────────────
+        $duplicate = $this->assetModel->findDuplicate($data);
+        if ($duplicate !== null) {
+            Response::error(
+                "An asset with the same {$duplicate['field']} already exists in the system (ID: {$duplicate['id']}). " .
+                "Please verify the entry and use a unique value.",
+                409
+            );
+            return;
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         $result = $this->assetModel->create($data);
 
         if (!$result['success']) {
@@ -131,6 +143,19 @@ class AssetController
         }
 
         $oldAsset = $this->assetModel->getById($id);
+
+        // ── Duplicate check (exclude self) ───────────────────────────────────
+        $duplicate = $this->assetModel->findDuplicate($data, $id);
+        if ($duplicate !== null) {
+            Response::error(
+                "Another asset already has the same {$duplicate['field']} (ID: {$duplicate['id']}). " .
+                "Please use a unique value.",
+                409
+            );
+            return;
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         $result = $this->assetModel->update($id, $data);
 
         if ($result['success']) {
@@ -337,10 +362,10 @@ class AssetController
                 $assetData['approval_status'] = 'Pending';
 
                 // Check for duplicate asset before inserting
-                $duplicateId = $this->assetModel->findDuplicate($assetData);
-                if ($duplicateId !== null) {
+                $duplicate = $this->assetModel->findDuplicate($assetData);
+                if ($duplicate !== null) {
                     $results['failed']++;
-                    $results['errors'][] = "Row " . ($index + 1) . ": Asset '{$assetData['name']}' already exists in the system (ID: {$duplicateId}). Skipped to prevent redundancy.";
+                    $results['errors'][] = "Row " . ($index + 1) . ": Asset '{$assetData['name']}' already exists in the system — duplicate {$duplicate['field']} (ID: {$duplicate['id']}). Skipped.";
                     continue;
                 }
 
@@ -376,6 +401,31 @@ class AssetController
         }
 
         Response::success($results, "Bulk import completed. {$results['success']} successful, {$results['failed']} failed.");
+    }
+
+    /**
+     * Check if an asset with the same unique identifiers already exists.
+     * Used by the frontend for real-time inline duplicate validation.
+     * Returns 200 if no duplicate; 409 if a duplicate is found.
+     */
+    public function checkDuplicate()
+    {
+        Middleware::requireAuth();
+
+        $data = Request::getJSON();
+        $excludeId = $data['_excludeId'] ?? null;
+
+        $duplicate = $this->assetModel->findDuplicate($data, $excludeId);
+
+        if ($duplicate !== null) {
+            Response::error(
+                "An asset with the same {$duplicate['field']} already exists in the system (ID: {$duplicate['id']}).",
+                409
+            );
+            return;
+        }
+
+        Response::success(null, 'No duplicate found');
     }
 
     /**

@@ -234,49 +234,64 @@ abstract class AssetModel
     }
 
     /**
-     * Check if a duplicate asset already exists in the table.
+     * Check if a duplicate asset already exists in the table based on unique identifiers.
+     *
+     * @param array       $data      Incoming (frontend-keyed) asset data.
+     * @param string|null $excludeId Asset ID to exclude from the check (use when editing).
+     *
+     * @return array|null  null if no duplicate; otherwise an array:
+     *                     ['id' => <existing_id>, 'field' => <matched_field_label>]
      */
-    public function findDuplicate($data)
+    public function findDuplicate($data, $excludeId = null)
     {
         $processed = $this->processInput($data);
 
-        $checkConditions = [];
-        $checkParams = [];
-        $checkTypes = "";
+        /**
+         * Each entry: [ db_column, human-readable label ]
+         * All six unique identifiers are checked independently so we can tell
+         * the user exactly which field caused the conflict.
+         */
+        $uniqueFields = [
+            'asset_tag'      => 'Asset Tag Number',
+            'serial_number'  => 'Serial Number',
+            'plate_number'   => 'Plate Number',
+            'desk_number'    => 'Desk Number',
+            'chassis_number' => 'Chassis Number',
+            'license_key'    => 'License Key / Reference',
+        ];
 
-        $uniqueFieldsToCheck = ['serial_number', 'plate_number', 'chassis_number', 'engine_number', 'asset_tag'];
-        $hasUniqueField = false;
-        foreach ($uniqueFieldsToCheck as $field) {
-            if (!empty($processed[$field])) {
-                $checkConditions[] = "`$field` = ?";
-                $checkParams[] = $processed[$field];
-                $checkTypes .= "s";
-                $hasUniqueField = true;
+        foreach ($uniqueFields as $column => $label) {
+            if (empty($processed[$column])) {
+                continue;
+            }
+
+            $value = $processed[$column];
+
+            $sql = "SELECT `id` FROM `{$this->table}` WHERE `{$column}` = ? LIMIT 1";
+            if ($excludeId !== null) {
+                $sql = "SELECT `id` FROM `{$this->table}` WHERE `{$column}` = ? AND `id` != ? LIMIT 1";
+            }
+
+            $stmt = $this->db->prepare($sql);
+            if (!$stmt) {
+                continue;
+            }
+
+            if ($excludeId !== null) {
+                $stmt->bind_param('ss', $value, $excludeId);
+            } else {
+                $stmt->bind_param('s', $value);
+            }
+
+            $stmt->execute();
+            $res = $stmt->get_result()->fetch_assoc();
+
+            if ($res) {
+                return ['id' => $res['id'], 'field' => $label];
             }
         }
 
-        if ($hasUniqueField) {
-            $query = "SELECT id FROM `" . $this->table . "` WHERE " . implode(" OR ", $checkConditions) . " LIMIT 1";
-        } else {
-            // Match name, major_category, and category if no unique fields are provided
-            $query = "SELECT id FROM `" . $this->table . "` WHERE `name` = ? AND `major_category` = ? AND `category` = ? LIMIT 1";
-            $checkParams = [
-                $processed['name'] ?? '',
-                $processed['major_category'] ?? '',
-                $processed['category'] ?? ''
-            ];
-            $checkTypes = "sss";
-        }
-
-        $stmt = $this->db->prepare($query);
-        if (!$stmt) {
-            return null;
-        }
-
-        $stmt->bind_param($checkTypes, ...$checkParams);
-        $stmt->execute();
-        $res = $stmt->get_result()->fetch_assoc();
-        return $res ? $res['id'] : null;
+        return null; // no duplicate found
     }
 }
 

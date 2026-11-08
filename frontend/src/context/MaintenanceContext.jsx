@@ -1,48 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useToast } from '../components/Toast';
 import * as API from '../services/api';
+import { useAuth } from './AuthContext';
 
 const MaintenanceContext = createContext();
 
 export const useMaintenanceTasks = () => useContext(MaintenanceContext);
 
 export const MaintenanceProvider = ({ children }) => {
+    const { user } = useAuth();
     const [maintenanceTasks, setMaintenanceTasks] = useState([]);
     const [loading, setLoading] = useState(false);
     const { addToast } = useToast();
 
-    // Load initial data from API - only if authenticated
-    useEffect(() => {
-        let isMounted = true;
+    // Define loadTasks for CRUD operations and sync
+    const loadTasks = useCallback(async () => {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            setMaintenanceTasks([]);
+            return;
+        }
 
-        const loadTasksOnMount = async () => {
-            const token = localStorage.getItem('auth_token');
-            if (!token || !isMounted) return;
-
-            try {
-                setLoading(true);
-                const response = await API.getMaintenanceTasks(1, 1000);
-                if (isMounted) {
-                    setMaintenanceTasks(response.data || []);
-                }
-            } catch (error) {
-                console.error('Failed to load maintenance tasks:', error);
-            } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
-            }
-        };
-
-        loadTasksOnMount();
-
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
-    // Define loadTasks for CRUD operations
-    const loadTasks = async () => {
         try {
             setLoading(true);
             const response = await API.getMaintenanceTasks(1, 1000);
@@ -53,7 +31,16 @@ export const MaintenanceProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [addToast]);
+
+    // Load initial data from API when authenticated
+    useEffect(() => {
+        if (user) {
+            loadTasks();
+        } else {
+            setMaintenanceTasks([]);
+        }
+    }, [user, loadTasks]);
 
     // CRUD Operations
     const addMaintenanceTask = async (newTask) => {

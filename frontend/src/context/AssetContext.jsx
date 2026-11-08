@@ -2,25 +2,29 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
 import * as API from '../services/api';
 import { getDefaultImage } from '../utils/assetImages';
+import { useAuth } from './AuthContext';
 
 const AssetContext = createContext();
 
 export const useAssets = () => useContext(AssetContext);
 
 export const AssetProvider = ({ children }) => {
+    const { user } = useAuth();
     const { addToast } = useToast();
     const [assets, setAssets] = useState([]);
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Load initial data from API only if authenticated
+    // Load initial data from API when authenticated
     useEffect(() => {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
+        if (user) {
             loadAssets();
             loadActivities();
+        } else {
+            setAssets([]);
+            setActivities([]);
         }
-    }, []);
+    }, [user]);
 
     const loadAssets = async (options = {}) => {
         try {

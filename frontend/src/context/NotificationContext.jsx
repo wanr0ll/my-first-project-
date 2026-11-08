@@ -1,88 +1,131 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as API from '../services/api';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
+    const { user } = useAuth();
     const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [isLoading, setIsLoading] = useState(false);
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = useCallback(async () => {
         const token = localStorage.getItem('auth_token');
         if (!token) {
             setNotifications([]);
+            setUnreadCount(0);
             return;
         }
 
         try {
+            setIsLoading(true);
             const response = await API.getNotifications();
-            if (response.success && response.data && response.data.notifications) {
-                const mapped = response.data.notifications.map(n => ({
+            if (response && response.success) {
+                // Support response.data as array OR response.data.notifications OR response.notifications
+                const rawList = Array.isArray(response.data)
+                    ? response.data
+                    : (Array.isArray(response.data?.notifications)
+                        ? response.data.notifications
+                        : (Array.isArray(response.notifications) ? response.notifications : []));
+
+                const mapped = rawList.map(n => ({
                     ...n,
                     read: n.is_read == 1 || n.is_read === true,
-                    timestamp: n.created_at
+                    timestamp: n.created_at || n.timestamp || new Date().toISOString()
                 }));
-                // Only update state if data actually changed to avoid re-renders (simplified here)
+
                 setNotifications(mapped);
+                setUnreadCount(mapped.filter(n => !n.read).length);
             }
         } catch (error) {
             console.error("Failed fetching notifications:", error);
+        } finally {
+            setIsLoading(false);
         }
-    };
+    }, []);
 
+    // Fetch immediately when user logs in or profile updates
     useEffect(() => {
-        fetchNotifications();
+        if (user) {
+            fetchNotifications();
+        } else {
+            setNotifications([]);
+            setUnreadCount(0);
+        }
+    }, [user, fetchNotifications]);
 
-        // Poll for new notifications every 30 seconds
-        const interval = setInterval(fetchNotifications, 30000);
+    // Polling and focus listener
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (localStorage.getItem('auth_token')) {
+                fetchNotifications();
+            }
+        }, 15000);
 
-        // Handle login/logout events dynamically if token changes
-        const handleStorage = () => fetchNotifications();
-        window.addEventListener('storage', handleStorage);
+        const handleFocus = () => {
+            if (localStorage.getItem('auth_token')) {
+                fetchNotifications();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        window.addEventListener('storage', handleFocus);
 
         return () => {
             clearInterval(interval);
-            window.removeEventListener('storage', handleStorage);
+            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('storage', handleFocus);
         };
-    }, []);
+    }, [fetchNotifications]);
 
     const addNotification = () => {
-        // Overrides local mock to rapidly fetch from server right after a successful action
         fetchNotifications();
     };
 
     const markAsRead = async (id) => {
+        // Optimistic update
+        setNotifications(prev =>
+            prev.map(n => n.id === id ? { ...n, read: true, is_read: true } : n)
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+
         try {
             await API.markNotificationAsRead(id);
-            setNotifications(prev =>
-                prev.map(n => n.id === id ? { ...n, read: true } : n)
-            );
         } catch (error) {
-            console.error("Error marking as read", error);
+            console.error("Error marking notification as read:", error);
         }
     };
 
     const markAllAsRead = async () => {
+        // Optimistic update
+        setNotifications(prev => prev.map(n => ({ ...n, read: true, is_read: true })));
+        setUnreadCount(0);
+
         try {
             await API.markAllNotificationsAsRead();
-            // Mark all current notifications as read instead of clearing them
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         } catch (error) {
-            console.error("Error marking all as read", error);
+            console.error("Error marking all notifications as read:", error);
         }
     };
 
     const clearNotifications = async () => {
+        // Optimistic update
+        setNotifications([]);
+        setUnreadCount(0);
+
         try {
             await API.clearAllNotifications();
-            setNotifications([]);
         } catch (error) {
-            console.error("Error clearing notifications", error);
+            console.error("Error clearing notifications:", error);
         }
     };
 
     return (
         <NotificationContext.Provider value={{
             notifications,
+            unreadCount,
+            isLoading,
             addNotification,
             markAsRead,
             markAllAsRead,

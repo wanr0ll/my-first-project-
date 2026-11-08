@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAssets } from '../context/AssetContext';
 import { calculateDepreciation } from '../utils/depreciation';
 import { getDefaultImage, getSaloonModelImage, getSUVModelImage, getPickupModelImage, getVanModelImage, getBusModelImage } from '../utils/assetImages';
-import { uploadAssetReceipt } from '../services/api';
+import { uploadAssetReceipt, checkAssetDuplicate } from '../services/api';
 
 const SUB_CATEGORIES = {
     'Land and Buildings': [
@@ -896,7 +896,7 @@ const PICKUP_MODELS = {
 const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
     const { user } = useAuth();
     const { addToast } = useToast();
-    const { addAsset, updateAsset } = useAssets();
+    const { assets, addAsset, updateAsset } = useAssets();
 
     const [activeTab, setActiveTab] = useState('General Info');
     const TABS = ['General Info', 'Specifications', 'Location & Ownership', 'Financials'];
@@ -920,6 +920,7 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
         status: 'Active',
         details: '',
         plate: '',
+        chassis: '',
         subType: '',
         serial: '',
         location: '',
@@ -1012,6 +1013,102 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
     const [formData, setFormData] = useState(getInitialFormData());
 
     const [errors, setErrors] = useState({});
+
+    // ── Duplicate-field warnings (real-time, debounced) ───────────────────────
+    // Maps field name → { checking: bool, duplicate: bool, message: string }
+    const [dupWarnings, setDupWarnings] = useState({});
+    const dupTimers = useRef({});
+
+    /**
+     * Unique fields to watch for duplicates.
+     * key   = formData field name (frontend)
+     * label = human-readable label shown in the warning
+     * api   = key sent to the backend check endpoint
+     */
+    const UNIQUE_FIELDS = {
+        assetTag:      { label: 'Asset Tag Number',        api: 'assetTag',      keys: ['asset_tag', 'assetTag'] },
+        serial:        { label: 'Serial Number',           api: 'serial',        keys: ['serial_number', 'serial'] },
+        plate:         { label: 'Plate Number',            api: 'plate',         keys: ['plate_number', 'plate'] },
+        deskNo:        { label: 'Desk Number',             api: 'deskNo',        keys: ['desk_number', 'deskNo'] },
+        chassis:       { label: 'Chassis Number',          api: 'chassis',       keys: ['chassis_number', 'chassis'] },
+        licenseKey:    { label: 'License Key / Reference', api: 'licenseKey',    keys: ['license_key', 'licenseKey'] },
+    };
+
+    /**
+     * Immediate in-memory duplicate check using assets already loaded in context.
+     */
+    const findLocalDuplicate = (fieldName, value) => {
+        if (!assets || !Array.isArray(assets) || !value) return null;
+        const normVal = value.trim().toLowerCase();
+        if (!normVal) return null;
+
+        const meta = UNIQUE_FIELDS[fieldName];
+        if (!meta) return null;
+
+        const excludeId = assetToEdit?.id;
+
+        for (const item of assets) {
+            if (excludeId && String(item.id) === String(excludeId)) continue;
+            for (const k of meta.keys) {
+                const val = item[k];
+                if (val && String(val).trim().toLowerCase() === normVal) {
+                    return { id: item.id, field: meta.label, name: item.name };
+                }
+            }
+        }
+        return null;
+    };
+
+    /**
+     * Debounce-check a single unique field against local cache and backend.
+     * Called whenever that field's value changes.
+     */
+    const scheduleDupCheck = (fieldName, value) => {
+        // Clear any previous pending timer for this field
+        if (dupTimers.current[fieldName]) {
+            clearTimeout(dupTimers.current[fieldName]);
+        }
+
+        const trimmed = (value || '').trim();
+        if (!trimmed) {
+            setDupWarnings(prev => ({ ...prev, [fieldName]: null }));
+            return;
+        }
+
+        // Fast local check first
+        const localMatch = findLocalDuplicate(fieldName, trimmed);
+        if (localMatch) {
+            setDupWarnings(prev => ({
+                ...prev,
+                [fieldName]: {
+                    checking: false,
+                    duplicate: true,
+                    message: `A registered asset already has this ${UNIQUE_FIELDS[fieldName].label} (ID: ${localMatch.id}).`
+                }
+            }));
+            return;
+        }
+
+        // Clear warning while waiting for remote check
+        setDupWarnings(prev => ({ ...prev, [fieldName]: null }));
+
+        // Show "checking…" and verify with backend API
+        dupTimers.current[fieldName] = setTimeout(async () => {
+            setDupWarnings(prev => ({ ...prev, [fieldName]: { checking: true } }));
+
+            const payload = { [UNIQUE_FIELDS[fieldName].api]: trimmed };
+            const excludeId = assetToEdit?.id || null;
+            const result = await checkAssetDuplicate(payload, excludeId);
+
+            setDupWarnings(prev => ({
+                ...prev,
+                [fieldName]: result.isDuplicate
+                    ? { checking: false, duplicate: true, message: `A registered asset already has this ${UNIQUE_FIELDS[fieldName].label} (ID: ${result.existingId}).` }
+                    : { checking: false, duplicate: false }
+            }));
+        }, 500);
+    };
+    // ─────────────────────────────────────────────────────────────────────────
 
     useEffect(() => {
         if (assetToEdit) {
@@ -1189,8 +1286,46 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
         }
     }, [assetToEdit, isOpen]);
 
+    /**
+     * Render inline duplicate indicator/warning beneath a field input.
+     */
+    const renderDupWarning = (fieldName) => {
+        const warn = dupWarnings[fieldName];
+        if (!warn) return null;
+
+        if (warn.checking) {
+            return (
+                <p className="text-[11px] text-text-muted flex items-center gap-1 mt-1 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-primary/60 inline-block"></span>
+                    Checking uniqueness…
+                </p>
+            );
+        }
+
+        if (warn.duplicate) {
+            return (
+                <p className="text-[11px] text-red-500 font-semibold flex items-center gap-1 mt-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    {warn.message}
+                </p>
+            );
+        }
+
+        return (
+            <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-1">
+                <Check size={12} className="shrink-0" />
+                Available (unique)
+            </p>
+        );
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
+
+        // Fire real-time duplicate check for unique identifier fields
+        if (name in UNIQUE_FIELDS) {
+            scheduleDupCheck(name, value);
+        }
 
         if (name === 'majorCategory') {
             const firstType = Object.keys(CATEGORY_HIERARCHY[value])[0];
@@ -1345,6 +1480,13 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
             if (formData.hasAssetTag === 'Yes' && !formData.assetTag?.trim()) {
                 newErrors.assetTag = 'Asset Tag is required if "Yes" is selected';
             }
+
+            // Duplicate identifier check
+            for (const [key, warn] of Object.entries(dupWarnings)) {
+                if (warn?.duplicate) {
+                    newErrors[key] = warn.message;
+                }
+            }
         }
 
         // ── TAB 2: Location & Ownership ─────────────────────────
@@ -1444,6 +1586,31 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
             setActiveTab(firstErrorTab);
             return;
         }
+
+        // ── Pre-submit Duplicate Check ───────────────────────────────────────
+        // Build payload of all unique fields that currently have values
+        const uniquePayload = {};
+        for (const [key, meta] of Object.entries(UNIQUE_FIELDS)) {
+            const val = (formData[key] || '').trim();
+            if (val) uniquePayload[meta.api] = val;
+        }
+
+        if (Object.keys(uniquePayload).length > 0) {
+            const excludeId = assetToEdit?.id || null;
+            const dupCheck = await checkAssetDuplicate(uniquePayload, excludeId);
+
+            if (dupCheck.isDuplicate) {
+                const conflictField = dupCheck.field || 'unique identifier';
+                addToast(
+                    `Cannot register asset: an asset with the same ${conflictField} already exists in the system (ID: ${dupCheck.existingId}).`,
+                    "error"
+                );
+                // Switch to the Specifications tab where most unique fields live
+                setActiveTab('Specifications');
+                return;
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         const assetId = assetToEdit?.id || `GHA-${formData.category.toUpperCase().slice(0, 3)}-${Date.now()}`;
 
@@ -1865,6 +2032,28 @@ const AddAssetModal = ({ isOpen, onClose, assetToEdit = null }) => {
                         {/* TAB 4: SPECIFICATIONS */}
                         {activeTab === 'Specifications' && (
                             <div className="space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                                {/* Duplicate Identifier Alert Banner */}
+                                {Object.entries(dupWarnings).some(([_, w]) => w?.duplicate) && (
+                                    <div className="p-4 rounded-2xl bg-red-500/10 border-2 border-red-500/30 text-red-600 dark:text-red-400 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="flex items-center gap-2 font-bold text-sm">
+                                            <AlertCircle size={18} className="shrink-0 text-red-500" />
+                                            Duplicate Asset Conflict Detected
+                                        </div>
+                                        <div className="text-xs space-y-1 pl-6">
+                                            {Object.entries(dupWarnings)
+                                                .filter(([_, w]) => w?.duplicate)
+                                                .map(([field, w]) => (
+                                                    <p key={field} className="font-semibold">
+                                                        • {w.message}
+                                                    </p>
+                                                ))}
+                                        </div>
+                                        <p className="text-[11px] opacity-80 pl-6 italic">
+                                            The system does not allow registering assets with duplicate unique identifiers (Asset Tag, Serial No., Plate No., Desk No., Chassis No., or License Key).
+                                        </p>
+                                    </div>
+                                )}
+
                                 {formData.subType === 'Office Desk' && (
                                     <div className="p-5 rounded-2xl bg-indigo-500/8 border-2 border-indigo-400/25 space-y-4">
                                         <div className="flex items-start justify-between">

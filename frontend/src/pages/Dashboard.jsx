@@ -15,11 +15,11 @@ import AddAssetModal from '../components/AddAssetModal';
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const { addToast } = useToast();
     const { user, permissions } = useAuth();
-    const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
     const [isAddAssetModalOpen, setIsAddAssetModalOpen] = useState(false);
     const [isMounted, setIsMounted] = React.useState(false);
+    const { assets, activities } = useAssets();
+    const { getActiveTasks } = useMaintenanceTasks();
 
     React.useEffect(() => {
         const timer = setTimeout(() => {
@@ -33,9 +33,6 @@ const Dashboard = () => {
     if (user && user.role === 'Worker') {
         return <WorkerDashboard user={user} />;
     }
-
-    const { assets, activities } = useAssets();
-    const { getActiveTasks } = useMaintenanceTasks();
 
     const allAssets = Array.isArray(assets) ? assets : [];
     const isInactive = (a) => ['archived', 'disposed', 'scrapped', 'sold'].includes((a.status || '').toLowerCase());

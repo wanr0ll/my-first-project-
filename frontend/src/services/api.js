@@ -7,7 +7,7 @@
 // In production, VITE_API_URL must be set in Netlify environment variables
 // pointing to your Supabase Edge Function, e.g. https://[YOUR-PROJECT-REF].supabase.co/functions/v1/api
 const CONFIGURED_BASE = import.meta.env.VITE_API_URL
-    || (import.meta.env.DEV ? '/api/index.php' : '');
+    || (import.meta.env.DEV ? '/api/index.php' : 'https://vuvhflqxlizmgllkssjr.supabase.co/functions/v1/api');
 
 const BASE_URL_CANDIDATES = import.meta.env.DEV
     ? [
@@ -161,10 +161,17 @@ class APIClient {
                 : `${baseUrl}?request=${basePath}`;
         }
 
+        const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
         const headers = {
-            'Content-Type': 'application/json',
             ...options.headers
         };
+
+        if (!isFormData && !headers['Content-Type']) {
+            headers['Content-Type'] = 'application/json';
+        }
+        if (isFormData) {
+            delete headers['Content-Type'];
+        }
 
         // Add authorization token if available
         const token = this.getToken();
@@ -236,9 +243,10 @@ class APIClient {
      * POST request
      */
     async post(endpoint, data = {}) {
+        const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
         return this.request(endpoint, {
             method: 'POST',
-            body: JSON.stringify(data)
+            body: isFormData ? data : JSON.stringify(data)
         });
     }
 
@@ -246,9 +254,10 @@ class APIClient {
      * PUT request
      */
     async put(endpoint, data = {}) {
+        const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
         return this.request(endpoint, {
             method: 'PUT',
-            body: JSON.stringify(data)
+            body: isFormData ? data : JSON.stringify(data)
         });
     }
 
@@ -495,34 +504,11 @@ export async function updateAsset(assetData) {
  * Upload a receipt / scanned document for an asset
  */
 export async function uploadAssetReceipt(assetId, file) {
-    const token = localStorage.getItem('auth_token');
+    const client = new APIClient();
     const formData = new FormData();
     formData.append('receipt', file);
     formData.append('asset_id', assetId);
-
-    const baseUrl = await resolveBaseUrl();
-    const url = `${baseUrl}?request=assets/upload_receipt`;
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
-        body: formData
-    });
-
-    if (!response.ok) {
-        let errorMsg = 'Failed to upload receipt';
-        try {
-            const error = await response.json();
-            errorMsg = error.message || errorMsg;
-        } catch {
-            // non-JSON fallback
-        }
-        throw new Error(errorMsg);
-    }
-
-    return response.json();
+    return client.post('assets/upload_receipt', formData);
 }
 
 /**
@@ -666,6 +652,42 @@ export async function clearAllNotifications() {
 export async function bulkImportAssets(assets) {
     const client = new APIClient();
     return client.post('assets/import', { assets });
+}
+
+/**
+ * Check for duplicate asset by unique identifier fields.
+ *
+ * Sends a lightweight POST to the backend which checks the six unique fields:
+ *   asset_tag, serial_number, plate_number, desk_number, chassis_number, license_key
+ *
+ * @param {object} fields  - Object with any subset of those fields (frontend keys).
+ * @param {string} [excludeId] - Asset ID to exclude (pass when editing an existing asset).
+ * @returns {Promise<{ isDuplicate: boolean, field: string|null, existingId: string|null }>}
+ */
+export async function checkAssetDuplicate(fields, excludeId = null) {
+    const client = new APIClient();
+    try {
+        const payload = { ...fields };
+        if (excludeId) payload._excludeId = excludeId;
+        const res = await client.post('assets/check_duplicate', payload);
+        // Backend returns success:true when NO duplicate found
+        return { isDuplicate: false, field: null, existingId: null };
+    } catch (err) {
+        // Backend returns 409 with message when a duplicate IS found
+        if (err.message && err.message.includes('already exists')) {
+            // Parse field name from message: "An asset with the same X already exists..."
+            const fieldMatch = err.message.match(/same (.+?) already exists/);
+            const idMatch = err.message.match(/\(ID: ([^)]+)\)/);
+            return {
+                isDuplicate: true,
+                field: fieldMatch ? fieldMatch[1] : 'unique field',
+                existingId: idMatch ? idMatch[1] : null,
+                message: err.message
+            };
+        }
+        // Network / other errors — don't block the user
+        return { isDuplicate: false, field: null, existingId: null };
+    }
 }
 
 export { APIClient };

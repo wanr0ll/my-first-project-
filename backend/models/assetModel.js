@@ -331,26 +331,35 @@ class AssetModel {
     }
 
     /**
-     * Detect duplicate asset during import
+     * Detect duplicate asset based on unique identifiers
      */
-    async findDuplicate(data) {
-        const serial = data.serial || data.serial_number;
-        const plate = data.plate || data.plate_number;
-        const tag = data.assetTag || data.asset_tag;
+    async findDuplicate(data, excludeId = null) {
+        const uniqueChecks = [
+            { val: data.assetTag || data.asset_tag, col: 'asset_tag', label: 'Asset Tag Number' },
+            { val: data.serial || data.serial_number, col: 'serial_number', label: 'Serial Number' },
+            { val: data.plate || data.plate_number, col: 'plate_number', label: 'Plate Number' },
+            { val: data.deskNo || data.desk_number, col: 'desk_number', label: 'Desk Number' },
+            { val: data.chassis || data.chassis_number, col: 'chassis_number', label: 'Chassis Number' },
+            { val: data.licenseKey || data.license_key, col: 'license_key', label: 'License Key / Reference' }
+        ];
 
-        if (serial) {
-            const res = await query('SELECT id FROM assets WHERE serial_number = $1 LIMIT 1;', [serial]);
-            if (res.rows.length > 0) return res.rows[0].id;
-        }
+        for (const { val, col, label } of uniqueChecks) {
+            if (val && typeof val === 'string' && val.trim()) {
+                const trimmed = val.trim();
+                let q = `SELECT id FROM assets WHERE LOWER(${col}) = LOWER($1)`;
+                const params = [trimmed];
 
-        if (plate) {
-            const res = await query('SELECT id FROM assets WHERE plate_number = $1 LIMIT 1;', [plate]);
-            if (res.rows.length > 0) return res.rows[0].id;
-        }
+                if (excludeId) {
+                    q += ' AND id != $2';
+                    params.push(excludeId);
+                }
+                q += ' LIMIT 1;';
 
-        if (tag) {
-            const res = await query('SELECT id FROM assets WHERE asset_tag = $1 LIMIT 1;', [tag]);
-            if (res.rows.length > 0) return res.rows[0].id;
+                const res = await query(q, params);
+                if (res.rows.length > 0) {
+                    return { id: res.rows[0].id, field: label };
+                }
+            }
         }
 
         return null;

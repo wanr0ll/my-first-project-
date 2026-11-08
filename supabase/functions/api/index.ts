@@ -53,10 +53,10 @@ function buildVerificationEmailHtml(name: string, otp: string): string {
     `;
 }
 
-async function sendEmailViaBrevo(to: string, subject: string, htmlContent: string): Promise<boolean> {
+async function sendEmailViaBrevo(to: string, subject: string, htmlContent: string): Promise<{ success: boolean; status?: number; error?: string }> {
     if (!BREVO_API_KEY) {
         console.warn(`[Mail] BREVO_API_KEY not configured. Email to ${to} was not sent.`);
-        return false;
+        return { success: false, error: "BREVO_API_KEY is not configured in Supabase secrets." };
     }
 
     try {
@@ -80,15 +80,15 @@ async function sendEmailViaBrevo(to: string, subject: string, htmlContent: strin
 
         if (response.status === 201 || response.ok) {
             console.log(`[Mail] Email sent successfully to ${to} via Brevo`);
-            return true;
+            return { success: true };
         }
 
         const errText = await response.text();
         console.error(`[Mail] Brevo API error (Status ${response.status}):`, errText);
-        return false;
+        return { success: false, status: response.status, error: errText };
     } catch (err: any) {
         console.error(`[Mail] Network error while sending email to ${to}:`, err.message);
-        return false;
+        return { success: false, error: err.message };
     }
 }
 
@@ -147,6 +147,47 @@ const authenticate = async (c: any) => {
 const generateId = (prefix = "AST") => {
     return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 };
+
+// Helper for extracting uploaded file (multipart/form-data) or JSON payload
+async function extractUploadedFileOrData(
+    c: any,
+    fieldName: string,
+    idField: string
+): Promise<{ id: string | null; dataUri: string | null; error?: string }> {
+    const contentType = c.req.header("content-type") || "";
+    let id: string | null = c.req.query(idField) || null;
+    let dataUri: string | null = null;
+
+    if (contentType.includes("multipart/form-data")) {
+        const formData = await c.req.formData().catch(() => null);
+        if (!formData) return { id: null, dataUri: null, error: "Invalid form data" };
+
+        const formId = formData.get(idField);
+        if (formId && typeof formId === "string") id = formId;
+
+        const file = formData.get(fieldName);
+        if (file && typeof (file as any).arrayBuffer === "function") {
+            const blob = file as Blob;
+            const buffer = await blob.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = "";
+            const chunkSize = 8192;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                const chunk = bytes.subarray(i, i + chunkSize);
+                binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+            }
+            const base64 = btoa(binary);
+            const mimeType = (file as any).type || "application/octet-stream";
+            dataUri = `data:${mimeType};base64,${base64}`;
+        }
+    } else {
+        const body = await c.req.json().catch(() => ({}));
+        id = body[idField] || id;
+        dataUri = body[fieldName] || body.receipt_url || body.receipt || null;
+    }
+
+    return { id, dataUri };
+}
 
 // ============================================================
 // 3. Health Check
@@ -554,8 +595,26 @@ app.post("/auth/forgot-password", async (c) => {
         </div>
     `;
 
-    const mailSent = await sendEmailViaBrevo(user.email, subject, emailMessage);
-    return success(c, { email_sent: mailSent }, "A password reset email has been sent to your registered address.");
+    const mailResult = await sendEmailViaBrevo(user.email, subject, emailMessage);
+    return success(c, { email_sent: mailResult.success, detail: mailResult }, "A password reset email has been sent to your registered address.");
+});
+
+// POST /auth/test-email
+app.post("/auth/test-email", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const to = body.email || "ghaassetmanagementsystem@gmail.com";
+    const res = await sendEmailViaBrevo(
+        to,
+        "Test Email from Ghana Highway Authority Asset Manager",
+        "<p>This is a test email verifying that Brevo is working properly with Supabase!</p>"
+    );
+    return c.json({
+        ...res,
+        sender_email: BREVO_SENDER_EMAIL,
+        sender_name: BREVO_SENDER_NAME,
+        has_api_key: !!BREVO_API_KEY,
+        api_key_prefix: BREVO_API_KEY ? BREVO_API_KEY.substring(0, 10) + "..." : null,
+    });
 });
 
 // POST /auth/verify-reset-otp
@@ -912,7 +971,18 @@ const handleGetAssets = async (c: any) => {
 
     const categoryParam = c.req.param("category") || query.category;
     if (categoryParam && categoryParam !== "all") {
-        dbQuery = dbQuery.eq("category", categoryParam);
+        const canonicalCat = categoryParam.toLowerCase();
+        if (canonicalCat === "vehicles" || canonicalCat === "fleet") {
+            dbQuery = dbQuery.or("category.ilike.%vehicle%,category.ilike.%fleet%");
+        } else if (canonicalCat === "furniture") {
+            dbQuery = dbQuery.ilike("category", "%furniture%");
+        } else if (canonicalCat === "electronics" || canonicalCat === "ict") {
+            dbQuery = dbQuery.or("category.ilike.%electronic%,category.ilike.%ict%");
+        } else if (canonicalCat === "indoor_devices" || canonicalCat === "utility") {
+            dbQuery = dbQuery.or("category.ilike.%indoor%,category.ilike.%device%,category.ilike.%utility%");
+        } else {
+            dbQuery = dbQuery.or(`category.ilike.%${categoryParam}%,sub_type.ilike.%${categoryParam}%`);
+        }
     }
 
     if (query.majorCategory || query.major_category) {
@@ -920,6 +990,8 @@ const handleGetAssets = async (c: any) => {
     }
     if (query.status) dbQuery = dbQuery.eq("status", query.status);
     if (query.division) dbQuery = dbQuery.eq("division", query.division);
+    const appStatus = query.approvalStatus || query.approval_status;
+    if (appStatus) dbQuery = dbQuery.eq("approval_status", appStatus);
     if (query.search) {
         dbQuery = dbQuery.or(`name.ilike.%${query.search}%,id.ilike.%${query.search}%,serial_number.ilike.%${query.search}%`);
     }
@@ -953,23 +1025,31 @@ const ASSET_FIELD_MAPPING: Record<string, string> = {
     custodianName: "custodian_name",
     custodianID: "custodian_id",
     cost: "purchase_cost",
+    purchaseCost: "purchase_cost",
     purchaseDate: "purchase_date",
     lastService: "last_service_date",
     lastInspection: "last_inspection_date",
     serial: "serial_number",
+    serialNumber: "serial_number",
     plate: "plate_number",
+    plateNumber: "plate_number",
     chassis: "chassis_number",
+    chassisNumber: "chassis_number",
     engine: "engine_number",
+    engineNumber: "engine_number",
     usefulLife: "useful_life",
     residualValue: "residual_value",
     details: "notes",
     sizes: "sizes",
     color: "color",
     roomNo: "room_number",
+    roomNumber: "room_number",
     deskNo: "desk_number",
+    deskNumber: "desk_number",
     roomName: "room_name",
     staffAssignedTo: "staff_assigned_to",
     staffID: "staff_id",
+    staffId: "staff_id",
     type: "type",
     custodianAddress: "custodian_address",
     custodianMobile: "custodian_mobile",
@@ -1092,12 +1172,24 @@ function sanitizeAssetPayload(data: Record<string, any>): Record<string, any> {
         if (val === "" || val === undefined) {
             val = null;
         } else if (NUMERIC_COLUMNS.has(key)) {
-            const num = Number(val);
-            val = isNaN(num) ? null : num;
-        } else if (DATE_COLUMNS.has(key) && val) {
-            if (typeof val === "string" && (val.startsWith("0000") || val.trim() === "")) {
-                val = null;
+            if (typeof val === "string") {
+                val = val.replace(/[^0-9.-]/g, "");
             }
+            const num = Number(val);
+            val = isNaN(num) || val === "" ? null : num;
+        } else if (DATE_COLUMNS.has(key) && val) {
+            if (typeof val === "string") {
+                const trimmed = val.trim();
+                if (trimmed === "" || trimmed.startsWith("0000") || trimmed.toLowerCase() === "n/a" || trimmed.toLowerCase() === "null") {
+                    val = null;
+                } else {
+                    val = trimmed;
+                }
+            }
+        }
+
+        if (val === null && cleaned[key] !== undefined && cleaned[key] !== null) {
+            continue;
         }
 
         cleaned[key] = val;
@@ -1105,6 +1197,59 @@ function sanitizeAssetPayload(data: Record<string, any>): Record<string, any> {
 
     return cleaned;
 }
+
+const UNIQUE_ASSET_FIELDS: { column: string; label: string }[] = [
+    { column: "asset_tag", label: "Asset Tag Number" },
+    { column: "serial_number", label: "Serial Number" },
+    { column: "plate_number", label: "Plate Number" },
+    { column: "desk_number", label: "Desk Number" },
+    { column: "chassis_number", label: "Chassis Number" },
+    { column: "license_key", label: "License Key / Reference" },
+];
+
+async function findDuplicateAsset(
+    data: Record<string, any>,
+    excludeId?: string | null
+): Promise<{ id: string; field: string } | null> {
+    const cleaned = sanitizeAssetPayload(data);
+
+    for (const { column, label } of UNIQUE_ASSET_FIELDS) {
+        const val = cleaned[column] ?? data[column];
+        if (!val || typeof val !== "string" || !val.trim()) continue;
+
+        let query = supabase.from("assets").select("id").eq(column, val.trim()).limit(1);
+        if (excludeId) {
+            query = query.neq("id", excludeId);
+        }
+
+        const { data: matches, error: qErr } = await query;
+        if (!qErr && matches && matches.length > 0) {
+            return { id: matches[0].id, field: label };
+        }
+    }
+
+    return null;
+}
+
+// POST /assets/check_duplicate
+app.post("/assets/check_duplicate", async (c) => {
+    const authUser = await authenticate(c);
+    if (!authUser) return error(c, "Unauthorized", 401);
+
+    const body = await c.req.json().catch(() => ({}));
+    const excludeId = body._excludeId || null;
+
+    const duplicate = await findDuplicateAsset(body, excludeId);
+    if (duplicate) {
+        return error(
+            c,
+            `An asset with the same ${duplicate.field} already exists in the system (ID: ${duplicate.id}).`,
+            409
+        );
+    }
+
+    return success(c, null, "No duplicate found");
+});
 
 // POST /assets
 app.post("/assets", async (c) => {
@@ -1114,6 +1259,16 @@ app.post("/assets", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     if (!body.name || !body.category) {
         return error(c, "Name and category are required", 400);
+    }
+
+    // Duplicate check for unique identifiers
+    const duplicate = await findDuplicateAsset(body);
+    if (duplicate) {
+        return error(
+            c,
+            `An asset with the same ${duplicate.field} already exists in the system (ID: ${duplicate.id}). Please verify the entry and use a unique value.`,
+            409
+        );
     }
 
     const assetId = body.id || generateId("AST");
@@ -1145,6 +1300,13 @@ app.post("/assets", async (c) => {
         })
         .then(() => {});
 
+    notifyAdmins(
+        "New Asset Registered",
+        `Asset '${newAsset.name}' was registered by ${authUser.name || authUser.email}.`,
+        "success",
+        assetId
+    );
+
     return success(c, { id: assetId }, "Asset created successfully", 201);
 });
 
@@ -1156,6 +1318,16 @@ app.put("/assets", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const id = body.id || c.req.query("id");
     if (!id) return error(c, "Asset ID is required", 400);
+
+    // Duplicate check for unique identifiers (exclude self)
+    const duplicate = await findDuplicateAsset(body, id);
+    if (duplicate) {
+        return error(
+            c,
+            `Another asset already has the same ${duplicate.field} (ID: ${duplicate.id}). Please use a unique value.`,
+            409
+        );
+    }
 
     const updates = sanitizeAssetPayload({
         ...body,
@@ -1224,6 +1396,37 @@ app.delete("/assets", handleDeleteAsset);
 app.delete("/assets/:category", handleDeleteAsset);
 app.delete("/assets/:category/:id", handleDeleteAsset);
 
+// POST /assets/upload_receipt
+app.post("/assets/upload_receipt", async (c) => {
+    const authUser = await authenticate(c);
+    if (!authUser) return error(c, "Unauthorized", 401);
+
+    const { id: assetId, dataUri, error: extractErr } = await extractUploadedFileOrData(c, "receipt", "asset_id");
+    if (extractErr) return error(c, extractErr, 400);
+    if (!assetId) return error(c, "asset_id is required", 400);
+    if (!dataUri) return error(c, "No valid receipt file or URL provided", 400);
+
+    const { error: updErr } = await supabase
+        .from("assets")
+        .update({ receipt_url: dataUri, updated_at: new Date().toISOString() })
+        .eq("id", assetId);
+
+    if (updErr) return error(c, updErr.message, 500);
+
+    supabase
+        .from("asset_history")
+        .insert({
+            asset_id: assetId,
+            asset_type: "Asset",
+            action: "Receipt Uploaded",
+            description: `A receipt/scan was uploaded by ${authUser.name || authUser.email}`,
+            performed_by: authUser.id,
+        })
+        .then(() => {});
+
+    return success(c, { receipt_url: dataUri }, "Receipt uploaded successfully");
+});
+
 // POST /assets/import (Bulk Import)
 app.post("/assets/import", async (c) => {
     const authUser = await authenticate(c);
@@ -1236,24 +1439,203 @@ app.post("/assets/import", async (c) => {
         return error(c, "No assets provided", 400);
     }
 
-    const formattedAssets = assetsList.map((a: any) => ({
-        ...a,
-        id: a.id || generateId("AST"),
-        major_category: a.majorCategory || a.major_category || "Fixed Asset",
-        asset_type: a.assetType || a.asset_type || "Moveable",
-        approval_status: "Pending",
-        created_by: authUser.id,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-    }));
+    const results = {
+        total: assetsList.length,
+        success: 0,
+        failed: 0,
+        errors: [] as string[],
+    };
 
-    const { error: insErr } = await supabase.from("assets").insert(formattedAssets);
-    if (insErr) return error(c, insErr.message, 500);
+    const sanitizedList: Record<string, any>[] = [];
+    const rowNumbers: number[] = [];
+
+    // Pre-sanitize and check row-level requirements
+    for (let i = 0; i < assetsList.length; i++) {
+        const rowNum = i + 1;
+        const a = assetsList[i];
+        const name = a.name;
+        const category = a.category;
+
+        if (!name || !category) {
+            results.failed++;
+            results.errors.push(`Row ${rowNum}: Name and Category are required`);
+            continue;
+        }
+
+        const rawAsset = {
+            ...a,
+            id: a.id || generateId("AST"),
+            major_category: a.majorCategory || a.major_category || "Fixed Asset",
+            asset_type: a.assetType || a.asset_type || "Moveable",
+            approval_status: "Pending",
+            created_by: authUser.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+
+        const cleaned = sanitizeAssetPayload(rawAsset);
+        sanitizedList.push(cleaned);
+        rowNumbers.push(rowNum);
+    }
+
+    if (sanitizedList.length === 0) {
+        return success(c, results, "No valid assets to import");
+    }
+
+    // Query existing identifiers to detect duplicates (serial_number, plate_number, asset_tag, chassis_number, desk_number, license_key)
+    const serials = sanitizedList.map(a => a.serial_number).filter(Boolean);
+    const plates = sanitizedList.map(a => a.plate_number).filter(Boolean);
+    const tags = sanitizedList.map(a => a.asset_tag).filter(Boolean);
+    const chassises = sanitizedList.map(a => a.chassis_number).filter(Boolean);
+    const desks = sanitizedList.map(a => a.desk_number).filter(Boolean);
+    const licenses = sanitizedList.map(a => a.license_key).filter(Boolean);
+
+    const existingSerials = new Set<string>();
+    const existingPlates = new Set<string>();
+    const existingTags = new Set<string>();
+    const existingChassises = new Set<string>();
+    const existingDesks = new Set<string>();
+    const existingLicenses = new Set<string>();
+
+    try {
+        if (serials.length > 0) {
+            const { data: dupS } = await supabase.from("assets").select("serial_number").in("serial_number", serials);
+            if (dupS) dupS.forEach((d: any) => d.serial_number && existingSerials.add(String(d.serial_number).trim().toLowerCase()));
+        }
+        if (plates.length > 0) {
+            const { data: dupP } = await supabase.from("assets").select("plate_number").in("plate_number", plates);
+            if (dupP) dupP.forEach((d: any) => d.plate_number && existingPlates.add(String(d.plate_number).trim().toLowerCase()));
+        }
+        if (tags.length > 0) {
+            const { data: dupT } = await supabase.from("assets").select("asset_tag").in("asset_tag", tags);
+            if (dupT) dupT.forEach((d: any) => d.asset_tag && existingTags.add(String(d.asset_tag).trim().toLowerCase()));
+        }
+        if (chassises.length > 0) {
+            const { data: dupC } = await supabase.from("assets").select("chassis_number").in("chassis_number", chassises);
+            if (dupC) dupC.forEach((d: any) => d.chassis_number && existingChassises.add(String(d.chassis_number).trim().toLowerCase()));
+        }
+        if (desks.length > 0) {
+            const { data: dupD } = await supabase.from("assets").select("desk_number").in("desk_number", desks);
+            if (dupD) dupD.forEach((d: any) => d.desk_number && existingDesks.add(String(d.desk_number).trim().toLowerCase()));
+        }
+        if (licenses.length > 0) {
+            const { data: dupL } = await supabase.from("assets").select("license_key").in("license_key", licenses);
+            if (dupL) dupL.forEach((d: any) => d.license_key && existingLicenses.add(String(d.license_key).trim().toLowerCase()));
+        }
+    } catch (e) {
+        console.warn("Could not query duplicate identifiers:", e);
+    }
+
+    // Filter duplicates (both against DB and within the current batch)
+    const seenBatchSerials = new Set<string>();
+    const seenBatchPlates = new Set<string>();
+    const seenBatchTags = new Set<string>();
+    const seenBatchChassises = new Set<string>();
+    const seenBatchDesks = new Set<string>();
+    const seenBatchLicenses = new Set<string>();
+
+    const validAssets: Record<string, any>[] = [];
+    const validRowNums: number[] = [];
+
+    for (let i = 0; i < sanitizedList.length; i++) {
+        const asset = sanitizedList[i];
+        const rowNum = rowNumbers[i];
+
+        const sNorm = asset.serial_number ? String(asset.serial_number).trim().toLowerCase() : null;
+        const pNorm = asset.plate_number ? String(asset.plate_number).trim().toLowerCase() : null;
+        const tNorm = asset.asset_tag ? String(asset.asset_tag).trim().toLowerCase() : null;
+        const cNorm = asset.chassis_number ? String(asset.chassis_number).trim().toLowerCase() : null;
+        const dNorm = asset.desk_number ? String(asset.desk_number).trim().toLowerCase() : null;
+        const lNorm = asset.license_key ? String(asset.license_key).trim().toLowerCase() : null;
+
+        let duplicateReason: string | null = null;
+        if (sNorm && (existingSerials.has(sNorm) || seenBatchSerials.has(sNorm))) {
+            duplicateReason = `serial number '${asset.serial_number}'`;
+        } else if (pNorm && (existingPlates.has(pNorm) || seenBatchPlates.has(pNorm))) {
+            duplicateReason = `plate number '${asset.plate_number}'`;
+        } else if (tNorm && (existingTags.has(tNorm) || seenBatchTags.has(tNorm))) {
+            duplicateReason = `asset tag '${asset.asset_tag}'`;
+        } else if (cNorm && (existingChassises.has(cNorm) || seenBatchChassises.has(cNorm))) {
+            duplicateReason = `chassis number '${asset.chassis_number}'`;
+        } else if (dNorm && (existingDesks.has(dNorm) || seenBatchDesks.has(dNorm))) {
+            duplicateReason = `desk number '${asset.desk_number}'`;
+        } else if (lNorm && (existingLicenses.has(lNorm) || seenBatchLicenses.has(lNorm))) {
+            duplicateReason = `license key '${asset.license_key}'`;
+        }
+
+        if (duplicateReason) {
+            results.failed++;
+            results.errors.push(`Row ${rowNum}: Asset '${asset.name}' already exists in the system (${duplicateReason}). Skipped.`);
+            continue;
+        }
+
+        if (sNorm) seenBatchSerials.add(sNorm);
+        if (pNorm) seenBatchPlates.add(pNorm);
+        if (tNorm) seenBatchTags.add(tNorm);
+        if (cNorm) seenBatchChassises.add(cNorm);
+        if (dNorm) seenBatchDesks.add(dNorm);
+        if (lNorm) seenBatchLicenses.add(lNorm);
+
+        validAssets.push(asset);
+        validRowNums.push(rowNum);
+    }
+
+    // Insert valid non-duplicate assets
+    if (validAssets.length > 0) {
+        const { error: insErr } = await supabase.from("assets").insert(validAssets);
+        if (insErr) {
+            console.warn("Batch insert error, attempting row-by-row fallback:", insErr.message);
+            // Fallback to inserting row-by-row so one bad row doesn't fail all valid rows
+            const insertedAssets: Record<string, any>[] = [];
+            for (let i = 0; i < validAssets.length; i++) {
+                const item = validAssets[i];
+                const rowNum = validRowNums[i];
+                const { error: sErr } = await supabase.from("assets").insert(item);
+                if (sErr) {
+                    results.failed++;
+                    results.errors.push(`Row ${rowNum} (${item.name}): ${sErr.message}`);
+                } else {
+                    results.success++;
+                    insertedAssets.push(item);
+                }
+            }
+
+            if (insertedAssets.length > 0) {
+                const historyRows = insertedAssets.map(asset => ({
+                    asset_id: asset.id,
+                    asset_type: asset.asset_type || "Asset",
+                    action: "Asset Bulk Imported",
+                    description: `Asset '${asset.name}' was bulk imported by ${authUser.name || authUser.email}`,
+                    performed_by: authUser.id,
+                }));
+                supabase.from("asset_history").insert(historyRows).then(() => {});
+            }
+        } else {
+            results.success += validAssets.length;
+
+            const historyRows = validAssets.map(asset => ({
+                asset_id: asset.id,
+                asset_type: asset.asset_type || "Asset",
+                action: "Asset Bulk Imported",
+                description: `Asset '${asset.name}' was bulk imported by ${authUser.name || authUser.email}`,
+                performed_by: authUser.id,
+            }));
+            supabase.from("asset_history").insert(historyRows).then(() => {});
+        }
+    }
+
+    if (results.success > 0) {
+        notifyAdmins(
+            "Bulk Asset Import",
+            `${results.success} assets were successfully imported by ${authUser.name || authUser.email}.`,
+            "success"
+        );
+    }
 
     return success(
         c,
-        { total: formattedAssets.length, success: formattedAssets.length },
-        `Successfully imported ${formattedAssets.length} assets`
+        results,
+        `Bulk import completed. ${results.success} successful, ${results.failed} failed.`
     );
 });
 
@@ -1327,13 +1709,34 @@ app.post("/maintenance", async (c) => {
     return success(c, { id: taskId }, "Maintenance task created successfully", 201);
 });
 
-// PUT /maintenance/:id
-app.put("/maintenance/:id", async (c) => {
+// POST /maintenance/upload_receipt
+app.post("/maintenance/upload_receipt", async (c) => {
     const authUser = await authenticate(c);
     if (!authUser) return error(c, "Unauthorized", 401);
 
-    const id = c.req.param("id");
+    const { id: taskId, dataUri, error: extractErr } = await extractUploadedFileOrData(c, "receipt", "task_id");
+    if (extractErr) return error(c, extractErr, 400);
+    if (!taskId) return error(c, "task_id is required", 400);
+    if (!dataUri) return error(c, "No valid receipt file or URL provided", 400);
+
+    const { error: updErr } = await supabase
+        .from("maintenance_tasks")
+        .update({ receipt_url: dataUri, updated_at: new Date().toISOString() })
+        .eq("id", taskId);
+
+    if (updErr) return error(c, updErr.message, 500);
+
+    return success(c, { receipt_url: dataUri }, "Receipt uploaded successfully");
+});
+
+// PUT /maintenance and PUT /maintenance/:id
+const handleUpdateMaintenance = async (c: any) => {
+    const authUser = await authenticate(c);
+    if (!authUser) return error(c, "Unauthorized", 401);
+
     const body = await c.req.json().catch(() => ({}));
+    const id = c.req.param("id") || body.id || c.req.query("id");
+    if (!id) return error(c, "Task ID is required", 400);
 
     const updates = { ...body, updated_at: new Date().toISOString() };
     delete updates.id;
@@ -1342,19 +1745,26 @@ app.put("/maintenance/:id", async (c) => {
     if (updErr) return error(c, updErr.message, 500);
 
     return success(c, null, "Maintenance task updated successfully");
-});
+};
 
-// DELETE /maintenance/:id
-app.delete("/maintenance/:id", async (c) => {
+// DELETE /maintenance and DELETE /maintenance/:id
+const handleDeleteMaintenance = async (c: any) => {
     const authUser = await authenticate(c);
     if (!authUser) return error(c, "Unauthorized", 401);
 
-    const id = c.req.param("id");
+    const id = c.req.param("id") || c.req.query("id");
+    if (!id) return error(c, "Task ID is required", 400);
+
     const { error: delErr } = await supabase.from("maintenance_tasks").delete().eq("id", id);
     if (delErr) return error(c, delErr.message, 500);
 
     return success(c, null, "Maintenance task deleted successfully");
-});
+};
+
+app.put("/maintenance", handleUpdateMaintenance);
+app.put("/maintenance/:id", handleUpdateMaintenance);
+app.delete("/maintenance", handleDeleteMaintenance);
+app.delete("/maintenance/:id", handleDeleteMaintenance);
 
 // ============================================================
 // 8. History & Activity Endpoints
@@ -1387,22 +1797,98 @@ app.get("/history", handleGetHistory);
 app.get("/activity", handleGetHistory);
 
 // ============================================================
+// ============================================================
 // 9. Notifications Endpoints
 // ============================================================
+async function notifyAdmins(title: string, message: string, type: string = "info", relatedAssetId: string | null = null) {
+    try {
+        const { data: adminUsers } = await supabase
+            .from("users")
+            .select("id")
+            .in("role", ["Super Admin", "Administrator", "Admin"]);
+
+        const userIds = adminUsers && adminUsers.length > 0
+            ? adminUsers.map((u: any) => u.id)
+            : ["USR_SUPER"];
+
+        const uniqueIds = Array.from(new Set([...userIds, "USR_SUPER"]));
+
+        const notifRows = uniqueIds.map(uid => ({
+            user_id: uid,
+            title,
+            message,
+            type,
+            related_asset_id: relatedAssetId,
+            is_read: false,
+            created_at: new Date().toISOString(),
+        }));
+
+        await supabase.from("notifications").insert(notifRows);
+    } catch (err: any) {
+        console.warn("Failed to notify admins:", err?.message);
+    }
+}
+
 app.get("/notifications", async (c) => {
     const authUser = await authenticate(c);
     if (!authUser) return error(c, "Unauthorized", 401);
 
-    const { data: notifs, error: nErr } = await supabase
+    const isAdmin = authUser.role === "Super Admin" || authUser.role === "Administrator" || authUser.role === "Admin";
+
+    let dbQuery = supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", authUser.id)
         .order("created_at", { ascending: false })
         .limit(50);
 
+    if (isAdmin) {
+        // Admins can see notifications addressed to them, or to USR_SUPER (system broadcasts)
+        dbQuery = dbQuery.or(`user_id.eq.${authUser.id},user_id.eq.USR_SUPER`);
+    } else {
+        dbQuery = dbQuery.eq("user_id", authUser.id);
+    }
+
+    const { data: notifs, error: nErr } = await dbQuery;
+
     if (nErr) return error(c, nErr.message, 500);
 
-    return success(c, notifs || [], "Notifications retrieved");
+    const list = notifs || [];
+    const unreadCount = list.filter((n: any) => !n.is_read).length;
+
+    // Return in both formats (nested object and top-level array) to guarantee frontend compatibility
+    return c.json({
+        success: true,
+        message: "Notifications retrieved successfully",
+        data: {
+            notifications: list,
+            unread_count: unreadCount,
+        },
+        notifications: list,
+        unread_count: unreadCount,
+    });
+});
+
+app.put("/notifications", async (c) => {
+    const authUser = await authenticate(c);
+    if (!authUser) return error(c, "Unauthorized", 401);
+
+    const body = await c.req.json().catch(() => ({}));
+
+    if (body.mark_all) {
+        await supabase.from("notifications").update({ is_read: true }).eq("user_id", authUser.id);
+        if (authUser.role === "Super Admin" || authUser.role === "Administrator") {
+            await supabase.from("notifications").update({ is_read: true }).eq("user_id", "USR_SUPER");
+        }
+        return success(c, null, "All notifications marked as read");
+    }
+
+    const id = body.id || c.req.query("id");
+    if (id) {
+        await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+        return success(c, null, "Notification marked as read");
+    }
+
+    return error(c, "Notification ID or mark_all flag required", 400);
 });
 
 app.put("/notifications/read-all", async (c) => {
@@ -1410,6 +1896,9 @@ app.put("/notifications/read-all", async (c) => {
     if (!authUser) return error(c, "Unauthorized", 401);
 
     await supabase.from("notifications").update({ is_read: true }).eq("user_id", authUser.id);
+    if (authUser.role === "Super Admin" || authUser.role === "Administrator") {
+        await supabase.from("notifications").update({ is_read: true }).eq("user_id", "USR_SUPER");
+    }
     return success(c, null, "All notifications marked as read");
 });
 
@@ -1418,8 +1907,34 @@ app.put("/notifications/:id/read", async (c) => {
     if (!authUser) return error(c, "Unauthorized", 401);
 
     const id = c.req.param("id");
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id).eq("user_id", authUser.id);
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
     return success(c, null, "Notification marked as read");
+});
+
+app.delete("/notifications", async (c) => {
+    const authUser = await authenticate(c);
+    if (!authUser) return error(c, "Unauthorized", 401);
+
+    const id = c.req.query("id");
+    if (id) {
+        await supabase.from("notifications").delete().eq("id", id);
+        return success(c, null, "Notification deleted");
+    }
+
+    await supabase.from("notifications").delete().eq("user_id", authUser.id);
+    if (authUser.role === "Super Admin") {
+        await supabase.from("notifications").delete().eq("user_id", "USR_SUPER");
+    }
+    return success(c, null, "All notifications cleared");
+});
+
+app.delete("/notifications/:id", async (c) => {
+    const authUser = await authenticate(c);
+    if (!authUser) return error(c, "Unauthorized", 401);
+
+    const id = c.req.param("id");
+    await supabase.from("notifications").delete().eq("id", id);
+    return success(c, null, "Notification deleted");
 });
 
 // ============================================================

@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 // Specific actions first
+router.post('/check_duplicate', requireAuth, (req, res) => assetController.checkDuplicate(req, res));
 router.post('/import', requireAuth, (req, res) => assetController.bulkImport(req, res));
 router.post('/upload_receipt', requireAuth, upload.single('receipt'), (req, res) => assetController.uploadReceipt(req, res));
 router.put('/transfer', requireAuth, requireRole(['Super Admin', 'CEO', 'Chief Executive', 'Director']), (req, res) => assetController.transfer(req, res));

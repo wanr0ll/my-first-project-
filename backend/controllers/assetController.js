@@ -59,6 +59,16 @@ class AssetController {
             return error(res, 'Name, major category, and category are required', 400);
         }
 
+        // Check for duplicates across unique identifiers
+        const duplicate = await assetModel.findDuplicate(data);
+        if (duplicate) {
+            return error(
+                res,
+                `An asset with the same ${duplicate.field} already exists in the system (ID: ${duplicate.id}). Please verify the entry and use a unique value.`,
+                409
+            );
+        }
+
         data.createdBy = user.id;
         data.approvalStatus = 'Pending';
 
@@ -102,6 +112,16 @@ class AssetController {
         const oldAsset = await assetModel.getById(id);
         if (!oldAsset) {
             return error(res, 'Asset not found', 404);
+        }
+
+        // Check for duplicates across unique identifiers (excluding current asset)
+        const duplicate = await assetModel.findDuplicate(data, id);
+        if (duplicate) {
+            return error(
+                res,
+                `Another asset already has the same ${duplicate.field} (ID: ${duplicate.id}). Please use a unique value.`,
+                409
+            );
         }
 
         const result = await assetModel.update(id, data);
@@ -151,6 +171,16 @@ class AssetController {
         const oldAsset = await assetModel.getById(id);
         if (!oldAsset) {
             return error(res, 'Asset not found', 404);
+        }
+
+        // Check for duplicates across unique identifiers (excluding current asset)
+        const duplicate = await assetModel.findDuplicate(data, id);
+        if (duplicate) {
+            return error(
+                res,
+                `Another asset already has the same ${duplicate.field} (ID: ${duplicate.id}). Please use a unique value.`,
+                409
+            );
         }
 
         const result = await assetModel.update(id, data);
@@ -238,13 +268,15 @@ class AssetController {
             }
 
             assetData.createdBy = user.id;
+            assetData.created_by = user.id;
             assetData.approvalStatus = 'Pending';
+            assetData.approval_status = 'Pending';
 
             // Check duplicate
-            const duplicateId = await assetModel.findDuplicate(assetData);
-            if (duplicateId) {
+            const duplicate = await assetModel.findDuplicate(assetData);
+            if (duplicate) {
                 results.failed++;
-                results.errors.push(`Row ${i + 1}: Asset '${name}' already exists (ID: ${duplicateId}). Skipped.`);
+                results.errors.push(`Row ${i + 1}: Asset '${name}' already exists — duplicate ${duplicate.field} (ID: ${duplicate.id}). Skipped.`);
                 continue;
             }
 
@@ -310,6 +342,25 @@ class AssetController {
         ).catch(() => {});
 
         return success(res, { receipt_url: receiptUrl }, 'Receipt uploaded successfully');
+    }
+
+    /**
+     * Check duplicate asset across unique identifiers
+     */
+    async checkDuplicate(req, res) {
+        const data = req.body || {};
+        const excludeId = data._excludeId || null;
+
+        const duplicate = await assetModel.findDuplicate(data, excludeId);
+        if (duplicate) {
+            return error(
+                res,
+                `An asset with the same ${duplicate.field} already exists in the system (ID: ${duplicate.id}).`,
+                409
+            );
+        }
+
+        return success(res, null, 'No duplicate found');
     }
 }
 
