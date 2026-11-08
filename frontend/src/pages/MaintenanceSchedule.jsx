@@ -62,16 +62,22 @@ const MaintenanceSchedule = () => {
     const { maintenanceTasks, addMaintenanceTask, updateMaintenanceTask, deleteMaintenanceTask } = useMaintenanceTasks();
     const { assets, updateAsset } = useAssets();
 
-    const approvedAssets = (assets || []).filter(a => a.approval_status === 'Approved');
+    const approvedAssets = (assets || []).filter(a => {
+        const app = (a.approval_status || 'Approved').toString().trim().toLowerCase();
+        return app === 'approved';
+    });
     // Show only approved assets whose status is "Under Maintenance" or "Maintenance" (or "Faulty")
     // and remove any asset that has already been scheduled for maintenance (active task exists)
     const maintenanceTargetAssets = approvedAssets.filter(a => {
-        const isUnderMaintenance = a.status === 'Under Maintenance' || a.status === 'Maintenance' || a.status === 'Faulty';
+        const s = (a.status || '').toString().trim().toLowerCase();
+        const isUnderMaintenance = s === 'under maintenance' || s === 'maintenance' || s === 'faulty' || s === 'in maintenance' || s === 'repair';
         if (!isUnderMaintenance) return false;
 
-        const hasActiveTask = (maintenanceTasks || []).some(
-            t => String(t.asset_id) === String(a.id) && t.status !== 'Completed' && t.status !== 'Cancelled'
-        );
+        const hasActiveTask = (maintenanceTasks || []).some(t => {
+            if (String(t.asset_id) !== String(a.id)) return false;
+            const tStatus = (t.status || '').toString().trim().toLowerCase();
+            return tStatus !== 'completed' && tStatus !== 'cancelled';
+        });
         return !hasActiveTask;
     });
 

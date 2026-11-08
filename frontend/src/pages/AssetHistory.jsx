@@ -281,7 +281,12 @@ const AssetHistory = () => {
                                                                 <ChevronDown size={14} className={`text-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                                             </div>
                                                         </div>
-                                                        <p className="text-sm text-text-secondary mt-1 leading-relaxed line-clamp-1">{item.description}</p>
+                                                        <p className="text-sm text-text-secondary mt-1 leading-relaxed">{item.description}</p>
+                                                        {item.changes && (
+                                                            <div className="mt-2 text-xs bg-bg-dark/40 border border-border-color/50 rounded-lg p-2 font-mono text-text-secondary whitespace-pre-line max-h-24 overflow-y-auto custom-scrollbar">
+                                                                {typeof item.changes === 'string' ? item.changes : JSON.stringify(item.changes, null, 2)}
+                                                            </div>
+                                                        )}
                                                         <div className="mt-2 flex items-center gap-2">
                                                             <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-[9px] font-bold uppercase">
                                                                 {item.performed_by_name?.charAt(0) || 'U'}

@@ -64,6 +64,7 @@ export const AssetProvider = ({ children }) => {
 
             if (response.success) {
                 addToast('Asset created successfully', 'success');
+                window.dispatchEvent(new Event('refresh_notifications'));
                 await loadAssets();
                 return { success: true, id: response.data?.id };
             } else {
@@ -83,6 +84,7 @@ export const AssetProvider = ({ children }) => {
 
             if (response.success) {
                 if (!options.silent) addToast('Asset updated successfully', 'success');
+                window.dispatchEvent(new Event('refresh_notifications'));
                 if (!options.skipRefresh) await loadAssets();
                 return { success: true };
             } else {
@@ -102,6 +104,7 @@ export const AssetProvider = ({ children }) => {
 
             if (response.success) {
                 addToast('Asset transferred successfully', 'success');
+                window.dispatchEvent(new Event('refresh_notifications'));
                 await loadAssets();
                 return { success: true };
             } else {

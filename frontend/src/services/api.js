@@ -549,12 +549,25 @@ export async function getMaintenanceTaskById(taskId) {
     return client.get('maintenance', { id: taskId });
 }
 
+function sanitizeMaintenanceData(taskData = {}) {
+    const cleaned = { ...taskData };
+    // Strip UI-only or joined properties that are not table columns
+    const forbidden = [
+        'asset', 'date', 'effectiveStatus', 'assignedTo', 'isVirtual',
+        'assigned_to_name', 'assetName', 'assetTitle', 'serviceProvider', 'technicianContact'
+    ];
+    for (const f of forbidden) {
+        delete cleaned[f];
+    }
+    return cleaned;
+}
+
 /**
  * Create maintenance task
  */
 export async function createMaintenanceTask(taskData) {
     const client = new APIClient();
-    return client.post('maintenance', taskData);
+    return client.post('maintenance', sanitizeMaintenanceData(taskData));
 }
 
 /**
@@ -564,7 +577,7 @@ export async function updateMaintenanceTask(taskId, taskData) {
     const client = new APIClient();
     return client.put('maintenance', {
         id: taskId,
-        ...taskData
+        ...sanitizeMaintenanceData(taskData)
     });
 }
 

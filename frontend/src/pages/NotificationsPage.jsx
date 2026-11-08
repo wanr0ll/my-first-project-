@@ -11,9 +11,10 @@ const NotificationsPage = () => {
     
     const selectedId = searchParams.get('id');
     
-    // Find the selected notification directly from the state
-    // Coerce to string to safely match ID strings or numbers
-    const selectedNotification = notifications.find(n => n.id.toString() === selectedId) || null;
+    // Find the selected notification directly from the state (defaults to the first if available)
+    const selectedNotification = (selectedId 
+        ? notifications.find(n => n.id?.toString() === selectedId)
+        : notifications[0]) || null;
 
     useEffect(() => {
         if (selectedNotification && !selectedNotification.read) {

@@ -1240,9 +1240,15 @@ const MAINTENANCE_FIELD_MAPPING: Record<string, string> = {
 function sanitizeMaintenancePayload(data: Record<string, any>): Record<string, any> {
     const cleaned: Record<string, any> = {};
 
+    // Explicit UI-only / joined fields to always skip (never send to Supabase)
+    const UI_ONLY_FIELDS = new Set([
+        "asset", "effectiveStatus", "isVirtual", "assigned_to_name",
+        "assetName", "assetTitle", "technicianContact", "serviceProvider"
+    ]);
+
     for (const [rawKey, rawVal] of Object.entries(data)) {
         // Skip joined / UI-only fields
-        if (["asset", "effectiveStatus", "isVirtual", "assigned_to_name"].includes(rawKey)) {
+        if (UI_ONLY_FIELDS.has(rawKey)) {
             continue;
         }
 
@@ -1439,8 +1445,14 @@ const handleUpdateAsset = async (c: any) => {
         }
     }
 
-    const statusChanged = updates.status && oldAsset?.status && updates.status !== oldAsset.status;
-    const approvalChanged = updates.approval_status && oldAsset?.approval_status && updates.approval_status !== oldAsset.approval_status;
+    const statusChanged = Boolean(
+        updates.status &&
+        (!oldAsset?.status || String(updates.status).trim().toLowerCase() !== String(oldAsset.status).trim().toLowerCase())
+    );
+    const approvalChanged = Boolean(
+        updates.approval_status &&
+        (!oldAsset?.approval_status || String(updates.approval_status).trim().toLowerCase() !== String(oldAsset.approval_status).trim().toLowerCase())
+    );
 
     let action = "Asset Updated";
     let desc = diffList.length > 0
@@ -1867,7 +1879,7 @@ app.post("/maintenance", async (c) => {
         updated_at: new Date().toISOString(),
     };
 
-    const { error: insErr } = await supabase.from("maintenance_tasks").insert(newTask);
+    const { error: insErr } = await supabase.from("maintenance_tasks").insert(newTask).select("id");
     if (insErr) return error(c, insErr.message, 500);
 
     // Audit log
@@ -2105,11 +2117,18 @@ async function notifyAdmins(
             .select("id")
             .in("role", ["Super Admin", "Administrator", "Admin", "Director", "CEO"]);
 
-        const userIds = adminUsers && adminUsers.length > 0
+        let userIds = adminUsers && adminUsers.length > 0
             ? adminUsers.map((u: any) => u.id)
             : [];
 
-        const uniqueIds = Array.from(new Set([...userIds, ...extraUserIds, "USR_SUPER"]));
+        // If no admins matched, fetch any existing users to notify
+        if (userIds.length === 0) {
+            const { data: fallbackUsers } = await supabase.from("users").select("id").limit(10);
+            userIds = (fallbackUsers || []).map((u: any) => u.id);
+        }
+
+        const uniqueIds = Array.from(new Set([...userIds, ...extraUserIds])).filter(Boolean);
+        if (uniqueIds.length === 0) return;
 
         const notifRows = uniqueIds.map(uid => ({
             user_id: uid,
@@ -2124,7 +2143,7 @@ async function notifyAdmins(
         const { error: insErr } = await supabase.from("notifications").insert(notifRows);
         if (insErr) {
             for (const row of notifRows) {
-                await supabase.from("notifications").insert(row);
+                await supabase.from("notifications").insert(row).catch(() => {});
             }
         }
     } catch (err: any) {
@@ -2146,12 +2165,11 @@ app.get("/notifications", async (c) => {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-    if (isAdmin) {
-        // Admins can see notifications addressed to them, or to USR_SUPER (system broadcasts) or 'all'
-        dbQuery = dbQuery.or(`user_id.eq.${authUser.id},user_id.eq.USR_SUPER,user_id.eq.all`);
-    } else {
+    if (!isAdmin) {
+        // Staff/Workers see their own notifications or broadcasts
         dbQuery = dbQuery.or(`user_id.eq.${authUser.id},user_id.eq.all`);
     }
+    // Admins, Directors, and CEOs see all notifications across the system
 
     const { data: notifs, error: nErr } = await dbQuery;
 

@@ -56,7 +56,10 @@ const ReportsAnalytics = () => {
     const { assets } = useAssets();
 
     const approvedAssetsList = useMemo(() => {
-        return (assets || []).filter(a => a.approval_status === 'Approved');
+        return (assets || []).filter(a => {
+            const app = (a.approval_status || 'Approved').toString().trim().toLowerCase();
+            return app === 'approved';
+        });
     }, [assets]);
 
     const nonArchivedApprovedAssets = useMemo(() => {
@@ -673,121 +676,137 @@ const ReportsAnalytics = () => {
 
                 {/* Status Breakdown */}
                 <div className="bg-bg-card rounded-3xl border border-border-color shadow-sm p-6 flex flex-col">
-                    <div className="mb-6">
-                        <h2 className="text-text-primary font-bold mb-1">Status Breakdown</h2>
-                        <p className="text-xs text-text-muted">Current condition &amp; status of all assets ({totalApprovedCount})</p>
+                    <div className="mb-4">
+                        <h2 className="text-text-primary font-bold mb-1">Status & Condition Breakdown</h2>
+                        <p className="text-xs text-text-muted">Operational readiness & physical condition of assets ({totalApprovedCount})</p>
                     </div>
 
-                    <div className="space-y-4 mt-2 flex-1 flex flex-col overflow-y-auto pr-2 max-h-[400px]">
-                        {/* Good Condition */}
+                    <div className="space-y-5 mt-1 flex-1 flex flex-col overflow-y-auto pr-2 max-h-[460px] custom-scrollbar">
+                        {/* Section A: Operational Status */}
                         <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Good
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted block mb-3">
+                                Operational Status
+                            </span>
+                            <div className="space-y-3">
+                                {/* Active Status */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div> Active
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{activeCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((activeCount / totalApprovedCount) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (activeCount / totalApprovedCount) * 100 : 0}%` }}></div>
+                                    </div>
                                 </div>
-                                <div className="text-text-secondary font-bold">{goodCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((goodCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (goodCount / totalApprovedCount) * 100 : 0}%` }}></div>
+
+                                {/* Maintenance Status */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> Under Maintenance
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{maintenanceCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((maintenanceCount / totalApprovedCount) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-orange-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (maintenanceCount / totalApprovedCount) * 100 : 0}%` }}></div>
+                                    </div>
+                                </div>
+
+                                {/* Inactive Status */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-zinc-500"></div> Inactive
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{inactiveCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((inactiveCount / totalApprovedCount) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-zinc-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (inactiveCount / totalApprovedCount) * 100 : 0}%` }}></div>
+                                    </div>
+                                </div>
+
+                                {/* Disposed Status */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-red-900"></div> Disposed
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{disposedCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((disposedCount / totalApprovedCount) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-red-900 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (disposedCount / totalApprovedCount) * 100 : 0}%` }}></div>
+                                    </div>
+                                </div>
+
+                                {/* Archived Status */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-purple-600"></div> Archived
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{archivedCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((archivedCount / totalApprovedCount) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-purple-600 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (archivedCount / totalApprovedCount) * 100 : 0}%` }}></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Fair Condition */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div> Fair
+                        {/* Section B: Physical Condition */}
+                        <div className="pt-2 border-t border-border-color/60">
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-text-muted block mb-3">
+                                Physical Condition
+                            </span>
+                            <div className="space-y-3">
+                                {/* Good Condition */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> Good
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{goodCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{(goodCount + fairCount + poorCount) > 0 ? Math.round((goodCount / (goodCount + fairCount + poorCount)) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(goodCount + fairCount + poorCount) > 0 ? (goodCount / (goodCount + fairCount + poorCount)) * 100 : 0}%` }}></div>
+                                    </div>
                                 </div>
-                                <div className="text-text-secondary font-bold">{fairCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((fairCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (fairCount / totalApprovedCount) * 100 : 0}%` }}></div>
-                            </div>
-                        </div>
 
-                        {/* Poor Condition */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-600"></div> Poor
+                                {/* Fair Condition */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div> Fair
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{fairCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{(goodCount + fairCount + poorCount) > 0 ? Math.round((fairCount / (goodCount + fairCount + poorCount)) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${(goodCount + fairCount + poorCount) > 0 ? (fairCount / (goodCount + fairCount + poorCount)) * 100 : 0}%` }}></div>
+                                    </div>
                                 </div>
-                                <div className="text-text-secondary font-bold">{poorCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((poorCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-red-600 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (poorCount / totalApprovedCount) * 100 : 0}%` }}></div>
-                            </div>
-                        </div>
 
-                        {/* Active Status */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div> Active
+                                {/* Poor Condition */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1 text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-text-primary">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-red-600"></div> Poor
+                                        </div>
+                                        <div className="text-text-secondary font-bold">{poorCount}</div>
+                                    </div>
+                                    <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{(goodCount + fairCount + poorCount) > 0 ? Math.round((poorCount / (goodCount + fairCount + poorCount)) * 100) : 0}%</div>
+                                    <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
+                                        <div className="h-full bg-red-600 rounded-full" style={{ width: `${(goodCount + fairCount + poorCount) > 0 ? (poorCount / (goodCount + fairCount + poorCount)) * 100 : 0}%` }}></div>
+                                    </div>
                                 </div>
-                                <div className="text-text-secondary font-bold">{activeCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((activeCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (activeCount / totalApprovedCount) * 100 : 0}%` }}></div>
-                            </div>
-                        </div>
-
-                        {/* Maintenance Status */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div> Maintenance
-                                </div>
-                                <div className="text-text-secondary font-bold">{maintenanceCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((maintenanceCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (maintenanceCount / totalApprovedCount) * 100 : 0}%` }}></div>
-                            </div>
-                        </div>
-
-                        {/* Inactive Status */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-zinc-500"></div> Inactive
-                                </div>
-                                <div className="text-text-secondary font-bold">{inactiveCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((inactiveCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-zinc-500 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (inactiveCount / totalApprovedCount) * 100 : 0}%` }}></div>
-                            </div>
-                        </div>
-
-                        {/* Disposed Status */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-900"></div> Disposed
-                                </div>
-                                <div className="text-text-secondary font-bold">{disposedCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((disposedCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-red-900 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (disposedCount / totalApprovedCount) * 100 : 0}%` }}></div>
-                            </div>
-                        </div>
-
-                        {/* Archived Status */}
-                        <div>
-                            <div className="flex justify-between items-center mb-1 text-sm font-medium">
-                                <div className="flex items-center gap-2 text-text-primary">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-purple-600"></div> Archived
-                                </div>
-                                <div className="text-text-secondary font-bold">{archivedCount}</div>
-                            </div>
-                            <div className="flex justify-end text-[9px] text-text-muted mb-1 font-bold">{totalApprovedCount > 0 ? Math.round((archivedCount / totalApprovedCount) * 100) : 0}%</div>
-                            <div className="h-1.5 w-full bg-border-color rounded-full overflow-hidden">
-                                <div className="h-full bg-purple-600 rounded-full" style={{ width: `${totalApprovedCount > 0 ? (archivedCount / totalApprovedCount) * 100 : 0}%` }}></div>
                             </div>
                         </div>
 

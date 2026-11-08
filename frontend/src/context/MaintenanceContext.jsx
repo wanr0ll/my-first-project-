@@ -48,6 +48,7 @@ export const MaintenanceProvider = ({ children }) => {
             const response = await API.createMaintenanceTask(newTask);
             if (response.success) {
                 addToast('Maintenance task created successfully', 'success');
+                window.dispatchEvent(new Event('refresh_notifications'));
                 await loadTasks(); // Reload tasks
                 return { success: true, id: response.data?.id };
             } else {
@@ -66,6 +67,7 @@ export const MaintenanceProvider = ({ children }) => {
             const response = await API.updateMaintenanceTask(taskId, updatedTask);
             if (response.success) {
                 addToast('Maintenance task updated successfully', 'success');
+                window.dispatchEvent(new Event('refresh_notifications'));
                 await loadTasks(); // Reload tasks
                 return { success: true };
             } else {

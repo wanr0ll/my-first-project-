@@ -1231,7 +1231,28 @@ const AssetInventory = () => {
                         </div>
                     ) : (
                         <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                            {assetHistory.map((item, idx) => (
+                            {assetHistory.map((item, idx) => {
+                                let diffs = null;
+                                try {
+                                    if (item.old_values || item.new_values) {
+                                        const oldV = typeof item.old_values === 'string' ? JSON.parse(item.old_values) : (item.old_values || {});
+                                        const newV = typeof item.new_values === 'string' ? JSON.parse(item.new_values) : (item.new_values || {});
+                                        const keys = new Set([...Object.keys(oldV), ...Object.keys(newV)]);
+                                        const list = [];
+                                        for (const k of keys) {
+                                            if (['updated_at', 'id', 'created_at'].includes(k)) continue;
+                                            const o = String(oldV[k] ?? '');
+                                            const n = String(newV[k] ?? '');
+                                            if (o !== n) {
+                                                const label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                                list.push({ label, from: o || '(empty)', to: n || '(empty)' });
+                                            }
+                                        }
+                                        if (list.length > 0) diffs = list;
+                                    }
+                                } catch (_) {}
+
+                                return (
                                 <div key={idx} className="p-4 rounded-xl border border-border-color bg-bg-hover/20 hover:bg-bg-hover/40 transition-all flex gap-4">
                                     <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
                                         <History size={18} />
@@ -1244,6 +1265,19 @@ const AssetInventory = () => {
                                         <p className="text-sm text-text-secondary mt-1 leading-relaxed">
                                             {item.description}
                                         </p>
+                                        {diffs && (
+                                            <div className="mt-2.5 p-2.5 rounded-lg bg-bg-dark/50 border border-border-color/60 text-xs space-y-1 font-mono">
+                                                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block mb-1">Field Changes:</span>
+                                                {diffs.map((d, di) => (
+                                                    <div key={di} className="flex flex-wrap items-center gap-1.5 text-text-secondary">
+                                                        <span className="font-semibold text-text-primary">{d.label}:</span>
+                                                        <span className="px-1.5 py-0.5 rounded bg-danger/10 text-danger text-[11px] line-through">{d.from}</span>
+                                                        <span className="text-text-muted">→</span>
+                                                        <span className="px-1.5 py-0.5 rounded bg-success/10 text-success text-[11px] font-bold">{d.to}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                         <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-text-muted">
                                             <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-primary uppercase">
                                                 {item.performed_by_name?.charAt(0) || 'U'}
@@ -1252,7 +1286,8 @@ const AssetInventory = () => {
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                            );
+                            })}
                         </div>
                     )}
                     <div className="flex justify-end pt-4">

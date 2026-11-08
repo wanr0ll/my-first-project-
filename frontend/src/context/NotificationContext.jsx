@@ -71,11 +71,13 @@ export const NotificationProvider = ({ children }) => {
 
         window.addEventListener('focus', handleFocus);
         window.addEventListener('storage', handleFocus);
+        window.addEventListener('refresh_notifications', handleFocus);
 
         return () => {
             clearInterval(interval);
             window.removeEventListener('focus', handleFocus);
             window.removeEventListener('storage', handleFocus);
+            window.removeEventListener('refresh_notifications', handleFocus);
         };
     }, [fetchNotifications]);
 
