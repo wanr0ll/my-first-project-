@@ -223,7 +223,11 @@ const ReportsAnalytics = () => {
             const row = selectedCols.map(col => {
                 const key = colMap[col];
                 let val = '';
-                if (key === 'annual_depreciation_calculated') {
+                if (key === 'ain') {
+                    val = asset.ain || asset.id || asset.asset_id || asset.asset_tag || 'N/A';
+                } else if (key === 'asset_name') {
+                    val = asset.name || asset.asset_name || asset.model || asset.description || '';
+                } else if (key === 'annual_depreciation_calculated') {
                     if (asset.major_category === 'Fixed Asset') {
                         val = calculateDepreciation(asset).annualDepreciation.toFixed(2);
                     } else {
@@ -523,20 +527,26 @@ const ReportsAnalytics = () => {
                                 .filter(a => {
                                     if (!deprSearch) return true;
                                     const q = deprSearch.toLowerCase();
-                                    return (a.ain || '').toLowerCase().includes(q) ||
-                                           (a.asset_name || '').toLowerCase().includes(q) ||
-                                           (a.category || '').toLowerCase().includes(q) ||
-                                           (a.division || '').toLowerCase().includes(q);
+                                    const ain = (a.ain || a.id || a.asset_id || a.asset_tag || '').toLowerCase();
+                                    const name = (a.name || a.asset_name || a.model || a.description || '').toLowerCase();
+                                    const cat = (a.category || '').toLowerCase();
+                                    const div = (a.division || '').toLowerCase();
+                                    return ain.includes(q) ||
+                                           name.includes(q) ||
+                                           cat.includes(q) ||
+                                           div.includes(q);
                                 })
                                 .map((asset) => {
                                     const depr = calculateDepreciation(asset);
                                     const cost = parseFloat(asset.purchase_cost) || 0;
                                     const pct = cost > 0 ? Math.min(100, Math.round((depr.accumulatedDepreciation / cost) * 100)) : 0;
+                                    const ainDisplay = asset.ain || asset.id || asset.asset_id || asset.asset_tag || 'N/A';
+                                    const nameDisplay = asset.name || asset.asset_name || asset.model || asset.description || '—';
 
                                     return (
-                                        <tr key={asset.id || asset.ain} className="border-b border-border-color hover:bg-bg-hover/30 transition-colors">
-                                            <td className="py-3.5 px-5 font-mono font-semibold text-primary">{asset.ain || 'N/A'}</td>
-                                            <td className="py-3.5 px-5 font-medium text-text-primary">{asset.asset_name}</td>
+                                        <tr key={asset.id || asset.ain || asset.asset_tag} className="border-b border-border-color hover:bg-bg-hover/30 transition-colors">
+                                            <td className="py-3.5 px-5 font-mono font-semibold text-primary">{ainDisplay}</td>
+                                            <td className="py-3.5 px-5 font-medium text-text-primary">{nameDisplay}</td>
                                             <td className="py-3.5 px-5 text-text-muted">{asset.category || 'General'}</td>
                                             <td className="py-3.5 px-5 text-text-muted">{asset.purchase_date ? asset.purchase_date.split('T')[0] : 'N/A'}</td>
                                             <td className="py-3.5 px-5 text-center text-text-muted font-semibold">{asset.useful_life ? `${asset.useful_life} yrs` : '5 yrs'}</td>

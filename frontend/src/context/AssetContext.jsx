@@ -32,10 +32,18 @@ export const AssetProvider = ({ children }) => {
                 setLoading(true);
             }
             const response = await API.getAssets('all', 1, 1000);
-            const augmentedAssets = (response.data || []).map(asset => ({
-                ...asset,
-                image: asset.image || getDefaultImage(asset)
-            }));
+            const augmentedAssets = (response.data || []).map(asset => {
+                const effectiveId = asset.id || asset.ain || asset.asset_id || asset.asset_tag || '';
+                const effectiveName = asset.name || asset.asset_name || asset.model || asset.description || 'Unnamed Asset';
+                return {
+                    ...asset,
+                    id: effectiveId,
+                    ain: asset.ain || effectiveId,
+                    name: effectiveName,
+                    asset_name: asset.asset_name || effectiveName,
+                    image: asset.image || getDefaultImage(asset)
+                };
+            });
             setAssets(augmentedAssets);
         } catch (error) {
             console.error('Failed to load assets:', error);

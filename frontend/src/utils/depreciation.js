@@ -5,7 +5,8 @@
  */
 export const calculateDepreciation = (asset) => {
     // Only calculate for approved Fixed Assets
-    if (asset.major_category !== 'Fixed Asset' || asset.approval_status !== 'Approved') {
+    const approvalStatus = (asset.approval_status || 'Approved').toString().trim().toLowerCase();
+    if (asset.major_category !== 'Fixed Asset' || approvalStatus !== 'approved') {
         return {
             annualDepreciation: 0,
             accumulatedDepreciation: 0,

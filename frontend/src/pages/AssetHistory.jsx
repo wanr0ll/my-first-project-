@@ -103,7 +103,7 @@ const AssetHistory = () => {
                 combined.push({
                     ...item,
                     changes,
-                    assetName: linkedAsset?.name || item.asset_name || `Asset #${item.asset_id || 'N/A'}`,
+                    assetName: linkedAsset?.name || item.asset_name || item.name || item.asset?.name || `Asset #${item.asset_id || 'N/A'}`,
                     assetId: item.asset_id || ''
                 });
             }

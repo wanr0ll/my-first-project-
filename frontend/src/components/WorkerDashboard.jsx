@@ -136,7 +136,7 @@ const WorkerDashboard = ({ user }) => {
                                         <Wrench size={18} />
                                     </div>
                                     <div>
-                                        <p className="font-semibold text-text-primary text-sm">{task.asset_name}</p>
+                                        <p className="font-semibold text-text-primary text-sm">{task.asset_name || task.asset || task.name || `Asset #${task.asset_id || ''}`}</p>
                                         <p className="text-[10px] text-text-muted uppercase font-bold">{task.description?.substring(0, 30)}...</p>
                                     </div>
                                 </div>
