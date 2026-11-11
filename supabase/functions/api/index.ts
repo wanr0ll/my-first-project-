@@ -15,6 +15,8 @@ const JWT_SECRET = Deno.env.get("JWT_SECRET") || "gha_asset_manager_secret_key_2
 const BREVO_API_KEY = Deno.env.get("BREVO_API_KEY") || "";
 const BREVO_SENDER_EMAIL = Deno.env.get("BREVO_SENDER_EMAIL") || Deno.env.get("SMTP_FROM") || "ghaassetmanagementsystem@gmail.com";
 const BREVO_SENDER_NAME = Deno.env.get("BREVO_SENDER_NAME") || Deno.env.get("SMTP_FROM_NAME") || "Ghana Highway Authority";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
+const RESEND_SENDER_EMAIL = Deno.env.get("RESEND_SENDER_EMAIL") || "onboarding@resend.dev";
 
 function buildVerificationEmailHtml(name: string, otp: string): string {
     return `
@@ -84,12 +86,88 @@ async function sendEmailViaBrevo(to: string, subject: string, htmlContent: strin
         }
 
         const errText = await response.text();
+        let parsedError = errText;
+        try {
+            const parsed = JSON.parse(errText);
+            if (parsed.message && (parsed.message.includes("unrecognised IP address") || parsed.message.includes("authorised_ips"))) {
+                parsedError = "Brevo blocked request: Unrecognised IP address. Please deactivate 'Blocking unauthorized IP addresses' in your Brevo account (https://app.brevo.com/security/authorised_ips).";
+                console.error(`[Mail] ⚠️ BREVO IP RESTRICTION: ${parsedError}`);
+            } else if (parsed.message) {
+                parsedError = parsed.message;
+            }
+        } catch { }
+
         console.error(`[Mail] Brevo API error (Status ${response.status}):`, errText);
-        return { success: false, status: response.status, error: errText };
+        return { success: false, status: response.status, error: parsedError };
     } catch (err: any) {
-        console.error(`[Mail] Network error while sending email to ${to}:`, err.message);
+        console.error(`[Mail] Network error while sending email to ${to} via Brevo:`, err.message);
         return { success: false, error: err.message };
     }
+}
+
+async function sendEmailViaResend(to: string, subject: string, htmlContent: string): Promise<{ success: boolean; status?: number; error?: string }> {
+    if (!RESEND_API_KEY) {
+        return { success: false, error: "RESEND_API_KEY is not configured." };
+    }
+
+    try {
+        const fromAddress = `${BREVO_SENDER_NAME} <${RESEND_SENDER_EMAIL}>`;
+        const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${RESEND_API_KEY}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                from: fromAddress,
+                to: [to],
+                subject,
+                html: htmlContent,
+            }),
+        });
+
+        if (response.status === 200 || response.status === 201 || response.ok) {
+            console.log(`[Mail] Email sent successfully to ${to} via Resend`);
+            return { success: true };
+        }
+
+        const errText = await response.text();
+        console.error(`[Mail] Resend API error (Status ${response.status}):`, errText);
+        return { success: false, status: response.status, error: errText };
+    } catch (err: any) {
+        console.error(`[Mail] Network error while sending email to ${to} via Resend:`, err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+async function sendEmail(to: string, subject: string, htmlContent: string): Promise<{ success: boolean; status?: number; error?: string; provider?: string }> {
+    let lastError = "";
+
+    // 1. Try Brevo if configured
+    if (BREVO_API_KEY) {
+        const brevoRes = await sendEmailViaBrevo(to, subject, htmlContent);
+        if (brevoRes.success) {
+            return { ...brevoRes, provider: "brevo" };
+        }
+        lastError = brevoRes.error || "Brevo delivery failed";
+        console.warn(`[Mail] Brevo failed: ${lastError}. Checking for fallback provider...`);
+    }
+
+    // 2. Try Resend if configured
+    if (RESEND_API_KEY) {
+        const resendRes = await sendEmailViaResend(to, subject, htmlContent);
+        if (resendRes.success) {
+            return { ...resendRes, provider: "resend" };
+        }
+        lastError = resendRes.error || "Resend delivery failed";
+        console.warn(`[Mail] Resend failed: ${lastError}`);
+    }
+
+    if (!BREVO_API_KEY && !RESEND_API_KEY) {
+        return { success: false, error: "No email provider (BREVO_API_KEY or RESEND_API_KEY) configured in Supabase secrets." };
+    }
+
+    return { success: false, error: lastError };
 }
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -337,17 +415,21 @@ app.post("/auth/register", async (c) => {
         return error(c, `Registration failed: ${insertErr.message}`, 500);
     }
 
-    // Send verification email via Brevo
-    await sendEmailViaBrevo(
+    // Send verification email
+    const emailResult = await sendEmail(
         newUser.email,
         "Verify Your Account - Ghana Highway Authority",
         buildVerificationEmailHtml(newUser.name, otp)
     );
 
+    const message = emailResult.success
+        ? "Registration successful. Please check your email for the verification code."
+        : `Registration successful, but verification email could not be delivered (${emailResult.error}). Please check email configuration.`;
+
     return success(
         c,
-        { id: userId },
-        "Registration successful. Please check your email for the verification code.",
+        { id: userId, email_sent: emailResult.success, email_error: emailResult.error },
+        message,
         201
     );
 });
@@ -386,13 +468,21 @@ app.post("/auth/resend-verification", async (c) => {
         })
         .eq("id", user.id);
 
-    await sendEmailViaBrevo(
+    const emailResult = await sendEmail(
         user.email,
         "Verify Your Account - Ghana Highway Authority",
         buildVerificationEmailHtml(user.name, otp)
     );
 
-    return success(c, null, "A new verification code has been sent to your email.");
+    if (!emailResult.success) {
+        return error(
+            c,
+            `Could not send verification email: ${emailResult.error || "Delivery failed. Please check email provider settings."}`,
+            502
+        );
+    }
+
+    return success(c, { email_sent: true }, "A new verification code has been sent to your email.");
 });
 
 // POST /auth/verify-email
@@ -595,25 +685,33 @@ app.post("/auth/forgot-password", async (c) => {
         </div>
     `;
 
-    const mailResult = await sendEmailViaBrevo(user.email, subject, emailMessage);
-    return success(c, { email_sent: mailResult.success, detail: mailResult }, "A password reset email has been sent to your registered address.");
+    const mailResult = await sendEmail(user.email, subject, emailMessage);
+    return success(
+        c,
+        { email_sent: mailResult.success, detail: mailResult },
+        mailResult.success
+            ? "A password reset email has been sent to your registered address."
+            : `Password reset OTP generated, but email delivery failed (${mailResult.error}). Please contact your administrator.`
+    );
 });
 
 // POST /auth/test-email
 app.post("/auth/test-email", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const to = body.email || "ghaassetmanagementsystem@gmail.com";
-    const res = await sendEmailViaBrevo(
+    const res = await sendEmail(
         to,
         "Test Email from Ghana Highway Authority Asset Manager",
-        "<p>This is a test email verifying that Brevo is working properly with Supabase!</p>"
+        "<p>This is a test email verifying that your email configuration is working properly with Supabase!</p>"
     );
     return c.json({
         ...res,
         sender_email: BREVO_SENDER_EMAIL,
         sender_name: BREVO_SENDER_NAME,
-        has_api_key: !!BREVO_API_KEY,
-        api_key_prefix: BREVO_API_KEY ? BREVO_API_KEY.substring(0, 10) + "..." : null,
+        has_brevo_key: !!BREVO_API_KEY,
+        brevo_key_prefix: BREVO_API_KEY ? BREVO_API_KEY.substring(0, 10) + "..." : null,
+        has_resend_key: !!RESEND_API_KEY,
+        resend_key_prefix: RESEND_API_KEY ? RESEND_API_KEY.substring(0, 8) + "..." : null,
     });
 });
 
@@ -820,8 +918,8 @@ app.post("/users", async (c) => {
     const { error: insertErr } = await supabase.from("users").insert(newUser);
     if (insertErr) return error(c, insertErr.message, 500);
 
-    // Send welcome/invitation email via Brevo
-    sendEmailViaBrevo(
+    // Send welcome/invitation email
+    sendEmail(
         newUser.email,
         "Welcome to Ghana Highway Authority Asset Management System",
         `

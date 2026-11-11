@@ -154,7 +154,11 @@ export const AuthProvider = ({ children }) => {
             const response = await API.register(name, email, password, role, division, extra);
 
             if (response.success) {
-                addToast('Account created! Please check your email for a verification code.', 'success');
+                if (response.data?.email_sent === false) {
+                    addToast(response.message || 'Account created, but verification email could not be sent. Please check email settings.', 'warning');
+                } else {
+                    addToast(response.message || 'Account created! Please check your email for a verification code.', 'success');
+                }
                 // Refresh list if current user is super admin
                 if (user && user.role === 'Super Admin') {
                     loadUsers();
